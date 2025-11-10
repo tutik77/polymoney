@@ -1,0 +1,135 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-polymoney}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-polymoney}
+      POSTGRES_DB: ${POSTGRES_DB:-polymoney}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-polymoney} -d ${POSTGRES_DB:-polymoney}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+ 
+  adminer:
+    image: adminer:4
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+
+  api:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://polymoney:polymoney@db:5432/polymoney
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      ELASTICSEARCH_ENABLED: ${ELASTICSEARCH_ENABLED:-false}
+      LOG_TO_FILE: "false"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      REQUESTS_PER_SECOND: ${REQUESTS_PER_SECOND:-4}
+      MIN_REQUESTS_PER_SECOND: ${MIN_REQUESTS_PER_SECOND:-1}
+      MAX_REQUESTS_PER_SECOND: ${MAX_REQUESTS_PER_SECOND:-6}
+      ADAPT_UP_SUCCESSES: ${ADAPT_UP_SUCCESSES:-12}
+      ADAPT_DOWN_FACTOR: ${ADAPT_DOWN_FACTOR:-0.8}
+      ADAPT_UP_FACTOR: ${ADAPT_UP_FACTOR:-1.2}
+    ports:
+      - "8000:8000"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery_worker:
+    build: .
+    restart: unless-stopped
+    command: celery -A src.polymoney.celery_app worker --loglevel=info --concurrency=4
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://polymoney:polymoney@db:5432/polymoney
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      ELASTICSEARCH_ENABLED: ${ELASTICSEARCH_ENABLED:-false}
+      LOG_TO_FILE: "false"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery_beat:
+    build: .
+    restart: unless-stopped
+    command: celery -A src.polymoney.celery_app beat --loglevel=info
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://polymoney:polymoney@db:5432/polymoney
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      ELASTICSEARCH_ENABLED: ${ELASTICSEARCH_ENABLED:-false}
+      LOG_TO_FILE: "false"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  dozzle:
+    image: amir20/dozzle:latest
+    restart: unless-stopped
+    ports:
+      - "9999:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  db_data:
+  redis_data:
+
+
+
