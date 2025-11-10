@@ -25,7 +25,7 @@ REQUESTS_PER_SECOND=2
 
 ```bash
 python -m pip install -r requirements.txt
-python -m src.polymoney.ingest
+python -m src.ingest
 ```
 
 Notes
@@ -58,9 +58,9 @@ python -m pip install -r requirements.txt
 3) Place an order via CLI:
 
 ```bash
-python -m src.polymoney.place_order_cli <OUTCOME_TOKEN_ID> <buy|sell> <PRICE> <SIZE> [--tif GTC]
+python -m src.place_order_cli <OUTCOME_TOKEN_ID> <buy|sell> <PRICE> <SIZE> [--tif GTC]
 # example:
-python -m src.polymoney.place_order_cli 123456789012345678901234567890123456789012345678901234567890 buy 0.55 10 --tif GTC
+python -m src.place_order_cli 123456789012345678901234567890123456789012345678901234567890 buy 0.55 10 --tif GTC
 ```
 
 Signing basics
@@ -81,9 +81,9 @@ python -m pip install -r requirements.txt
 2) Run the API server:
 
 ```bash
-python -m src.polymoney.api.main
+python -m src.api.main
 # or with uvicorn directly
-# uvicorn src.polymoney.api.main:app --host 0.0.0.0 --port 8000 --reload
+# uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 3) Browse docs at `http://localhost:8000/docs`.
@@ -189,13 +189,13 @@ docker compose up -d db adminer
 2) Run the simulator for top 10 users with a $10,000,000 bankroll (refresh ingest by default):
 
 ```bash
-python -m src.polymoney.simulate_dry --top-n 10 --initial-cash 10000000
+python -m src.simulate_dry --top-n 10 --initial-cash 10000000
 ```
 
 3) To reuse existing DB without fetching fresh data:
 
 ```bash
-python -m src.polymoney.simulate_dry --no-refresh
+python -m src.simulate_dry --no-refresh
 ```
 
 The script prints a JSON summary with total and per-user PnL. It computes net PnL from closed positions as:
@@ -209,7 +209,7 @@ Realtime dry-run (activities with live quotes)
 1) Следим за пользователем/пользователями и копируем их сделки в симуляции по актуальным котировкам:
 
 ```bash
-python -m src.polymoney.simulate_realtime --user 0xUSER1 --user 0xUSER2 --initial-cash 10000000 \
+python -m src.simulate_realtime --user 0xUSER1 --user 0xUSER2 --initial-cash 10000000 \
   --slippage-bps 0 --max-trade-size 1000
 ```
 

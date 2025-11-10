@@ -72,7 +72,7 @@ services:
   celery_worker:
     build: .
     restart: unless-stopped
-    command: celery -A src.polymoney.celery_app worker --loglevel=info --concurrency=4
+    command: celery -A src.celery_app worker --loglevel=info --concurrency=4
     env_file:
       - .env
     environment:
@@ -97,7 +97,7 @@ services:
   celery_beat:
     build: .
     restart: unless-stopped
-    command: celery -A src.polymoney.celery_app beat --loglevel=info
+    command: celery -A src.celery_app beat --loglevel=info
     env_file:
       - .env
     environment:

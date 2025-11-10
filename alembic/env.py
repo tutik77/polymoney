@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
-from src.polymoney.config import get_settings
-from src.polymoney.models import Base
+from src.config import get_settings
+from src.models import Base
 
 config = context.config
 
