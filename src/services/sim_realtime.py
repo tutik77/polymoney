@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Optional, Tuple, Any, List
 
+from billiard.exceptions import SoftTimeLimitExceeded
 import structlog
 import time
 from collections import OrderedDict
@@ -532,6 +533,10 @@ async def follow_user_realtime_sim(
                 
                 await asyncio.sleep(interval)
             except asyncio.CancelledError:
+                log.info("sim_cancelled", user=user_address)
+                break
+            except SoftTimeLimitExceeded:
+                # Celery soft timeouts surface as this exception; treat as graceful cancel
                 log.info("sim_cancelled", user=user_address)
                 break
             except Exception as e:

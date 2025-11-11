@@ -4,6 +4,7 @@ import asyncio
 from typing import Optional
 import structlog
 
+from billiard.exceptions import SoftTimeLimitExceeded
 from .celery_app import celery_app
 from .services.ingest import ingest_top_leaderboard_once
 from .services.activities import follow_user_loop
@@ -101,7 +102,8 @@ def sim_realtime_task(
     
     try:
         asyncio.run(_run())
-    except asyncio.CancelledError:
+    except (asyncio.CancelledError, SoftTimeLimitExceeded):
+        # Normalize Celery soft timeouts and explicit revokes as "cancelled"
         return {"status": "cancelled", "user": user_address, "task_id": self.request.id}
     
     log.info("task_done", task="sim", user=user_address, id=self.request.id)
