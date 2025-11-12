@@ -43,7 +43,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://polymoney:polymoney@db:5432/polymoney
+      DATABASE_URL: postgresql+asyncpg://polymoney:polymoney@5.129.232.183:5432/polymoney
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       ELASTICSEARCH_HOSTS: http://elasticsearch:9200
@@ -76,7 +76,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://polymoney:polymoney@db:5432/polymoney
+      DATABASE_URL: postgresql+asyncpg://polymoney:polymoney@5.129.232.183:5432/polymoney
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       ELASTICSEARCH_HOSTS: http://elasticsearch:9200
@@ -101,7 +101,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://polymoney:polymoney@db:5432/polymoney
+      DATABASE_URL: postgresql+asyncpg://polymoney:polymoney@5.129.232.183:5432/polymoney
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       ELASTICSEARCH_HOSTS: http://elasticsearch:9200

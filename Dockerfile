@@ -15,8 +15,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt ./
 RUN python -m pip install --upgrade pip && pip install -r requirements.txt
 
-# Copy source
+# Copy source and alembic config
 COPY src ./src
+COPY alembic.ini ./alembic.ini
+COPY alembic ./alembic
 
 EXPOSE 8000
 

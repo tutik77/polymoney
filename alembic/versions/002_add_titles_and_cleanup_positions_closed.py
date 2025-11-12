@@ -1,7 +1,7 @@
 """add titles and cleanup positions_closed columns
 
 Revision ID: 002_add_titles_and_cleanup
-Revises: 001_remove_raw_json_add_asset
+Revises: 001
 Create Date: 2025-11-12
 """
 
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = "002_add_titles_and_cleanup"
-down_revision = "001_remove_raw_json_add_asset"
+down_revision = "001"
 branch_labels = None
 depends_on = None
 
