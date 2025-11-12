@@ -121,7 +121,15 @@ class PolymarketClient:
             offset += len(data)
         return entries
 
-    async def fetch_user_closed_positions(self, user_id: str, page_size: Optional[int] = None, max_total: Optional[int] = None) -> List[Dict[str, Any]]:
+    async def fetch_user_closed_positions(
+        self,
+        user_id: str,
+        page_size: Optional[int] = None,
+        max_total: Optional[int] = None,
+        *,
+        sort_by: Optional[str] = None,
+        sort_direction: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         results: List[Dict[str, Any]] = []
         offset = 0
         if page_size is None:
@@ -134,8 +142,8 @@ class PolymarketClient:
             effective_limit = page_size if max_total is None else max(1, min(page_size, max_total - len(results)))
             params = {
                 "user": user_id,
-                "sortBy": "realizedpnl",
-                "sortDirection": "DESC",
+                "sortBy": (sort_by if sort_by is not None else "realizedpnl"),
+                "sortDirection": (sort_direction if sort_direction is not None else "DESC"),
                 "limit": effective_limit,
                 "offset": offset,
             }

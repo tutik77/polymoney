@@ -47,13 +47,9 @@ class ClosedPosition(Base):
     entry_avg_price: Mapped[Optional[float]] = mapped_column(Numeric(38, 8))
     exit_avg_price: Mapped[Optional[float]] = mapped_column(Numeric(38, 8))
     realized_pnl: Mapped[Optional[float]] = mapped_column(Numeric(38, 8))
-    fees_total: Mapped[Optional[float]] = mapped_column(Numeric(38, 8))
+    title: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
 
-    opened_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), index=True)
-    close_reason: Mapped[Optional[str]] = mapped_column(String(32))
-
-    tx_hash: Mapped[Optional[str]] = mapped_column(String(128), index=True)
 
     user: Mapped[User] = relationship(back_populates="positions")
     market: Mapped[Market] = relationship(back_populates="positions")
@@ -63,7 +59,7 @@ class ClosedPosition(Base):
             "user_pk",
             "market_pk",
             "side",
-            "tx_hash",
+            "closed_at",
             name="uq_positions_closed_dedupe",
         ),
     )
@@ -126,6 +122,7 @@ class Activity(Base):
     size: Mapped[Optional[float]] = mapped_column(Numeric(38, 8), nullable=True)
     fee: Mapped[Optional[float]] = mapped_column(Numeric(38, 8), nullable=True)
 
+    title: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     tx_hash: Mapped[Optional[str]] = mapped_column(String(128), index=True, nullable=True)
 
     user: Mapped[User] = relationship()
@@ -193,6 +190,7 @@ class SimClosedPosition(Base):
     realized_pnl: Mapped[float] = mapped_column(Numeric(38, 8))
     closed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     leader_address: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    title: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
 
 
 class SimTrade(Base):
@@ -209,5 +207,6 @@ class SimTrade(Base):
     fee: Mapped[float] = mapped_column(Numeric(38, 8))
     notional: Mapped[float] = mapped_column(Numeric(38, 8))
     exec_type: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    title: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     source_tx: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)
     source_ts: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)

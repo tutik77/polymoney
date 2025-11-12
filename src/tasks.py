@@ -65,7 +65,7 @@ def follow_user_activities_task(
     
     try:
         asyncio.run(_run())
-    except asyncio.CancelledError:
+    except (asyncio.CancelledError, SoftTimeLimitExceeded):
         return {"status": "cancelled", "user": user_address, "task_id": self.request.id}
     
     log.info("task_done", task="follow", user=user_address, id=self.request.id)
@@ -141,27 +141,31 @@ def settle_positions_all_task(
     force_settle_after_days: int = 2,
 ):
     async def _run():
-        await ensure_schema()
+        await dispose_engine()
+        try:
+            await ensure_schema()
         # Discover simulators from global portfolios
-        from .db import session_scope
-        from .models import SimPortfolioGlobal
-        sim_users: list[str] = []
-        async with session_scope() as session:
-            rows = await session.execute(select(SimPortfolioGlobal.sim_user).distinct())
-            sim_users = [r[0] for r in rows.all() if r and r[0]]
-        totals = {"settled_count": 0, "total_pnl": 0.0, "total_cash_change": 0.0, "sim_users": sim_users}
-        for su in sim_users or ["default"]:
-            try:
-                res = await settle_resolved_positions(
-                    sim_user=su,
-                    force_settle_after_days=force_settle_after_days,
-                )
-                totals["settled_count"] += res.settled_count
-                totals["total_pnl"] += res.total_pnl
-                totals["total_cash_change"] += res.total_cash_change
-            except Exception as e:
-                log.error("settle_user_error", sim_user=su, error=str(e)[:200])
-        return totals
+            from .db import session_scope
+            from .models import SimPortfolioGlobal
+            sim_users: list[str] = []
+            async with session_scope() as session:
+                rows = await session.execute(select(SimPortfolioGlobal.sim_user).distinct())
+                sim_users = [r[0] for r in rows.all() if r and r[0]]
+            totals = {"settled_count": 0, "total_pnl": 0.0, "total_cash_change": 0.0, "sim_users": sim_users}
+            for su in sim_users or ["default"]:
+                try:
+                    res = await settle_resolved_positions(
+                        sim_user=su,
+                        force_settle_after_days=force_settle_after_days,
+                    )
+                    totals["settled_count"] += res.settled_count
+                    totals["total_pnl"] += res.total_pnl
+                    totals["total_cash_change"] += res.total_cash_change
+                except Exception as e:
+                    log.error("settle_user_error", sim_user=su, error=str(e)[:200])
+            return totals
+        finally:
+            await dispose_engine()
     
     result = asyncio.run(_run())
     log.info("task_done", task="settle_all", id=self.request.id, **result)

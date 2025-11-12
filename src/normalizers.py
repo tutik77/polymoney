@@ -28,6 +28,7 @@ def normalize_activity(raw: Dict[str, Any]) -> Dict[str, Any]:
         "price": price,
         "size": size,
         "fee": fee,
+        "title": raw.get("marketTitle") or raw.get("title") or raw.get("slug"),
         "tx_hash": txh,
     }
 
@@ -40,17 +41,14 @@ def normalize_closed_position(raw: Dict[str, Any]) -> Dict[str, Any]:
         "market_external_id": raw.get("conditionId") or raw.get("marketId") or raw.get("market_id"),
         "market_slug": raw.get("marketSlug") or raw.get("slug") or raw.get("eventSlug"),
         "market_title": raw.get("marketTitle") or raw.get("title"),
+        "title": raw.get("marketTitle") or raw.get("title"),
         "side": raw.get("side") or "",
         "asset": raw.get("asset") or raw.get("tokenId") or raw.get("token_id"),
         "quantity": raw.get("quantity") or raw.get("totalBought"),
         "entry_avg_price": raw.get("entryAvg") or raw.get("avgPrice"),
         "exit_avg_price": raw.get("exitAvg") or raw.get("curPrice"),
         "realized_pnl": raw.get("realizedPnl"),
-        "fees_total": raw.get("fees"),
-        "opened_at": _parse_dt(raw.get("openedAt")),
         "closed_at": _parse_dt(raw.get("closedAt")) or _parse_dt(raw.get("endDate")),
-        "close_reason": raw.get("closeReason"),
-        "tx_hash": raw.get("txHash"),
     }
 
 

@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from .config import get_settings
 from .models import Base
@@ -19,10 +20,9 @@ def get_engine() -> AsyncEngine:
         settings = get_settings()
         _engine = create_async_engine(
             settings.database_url,
+            # Use NullPool to avoid cross-event-loop reuse issues in Celery/asyncio.run
+            poolclass=NullPool,
             future=True,
-            pool_pre_ping=True,
-            pool_size=settings.db_pool_size,
-            max_overflow=settings.db_max_overflow,
             hide_parameters=True,
         )
     return _engine
@@ -61,7 +61,11 @@ async def dispose_engine() -> None:
     global _engine, _session_factory
     try:
         if _engine is not None:
-            await _engine.dispose()
+            try:
+                await _engine.dispose()
+            except Exception:
+                # Best-effort: ignore disposal errors when loop is already closed or mismatched
+                pass
     finally:
         _engine = None
         _session_factory = None

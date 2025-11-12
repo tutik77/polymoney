@@ -67,11 +67,8 @@ async def bulk_insert_closed_positions(session: AsyncSession, user: User, norms:
             "entry_avg_price": n.get("entry_avg_price"),
             "exit_avg_price": n.get("exit_avg_price"),
             "realized_pnl": n.get("realized_pnl"),
-            "fees_total": n.get("fees_total"),
-            "opened_at": n.get("opened_at"),
             "closed_at": n.get("closed_at"),
-            "close_reason": n.get("close_reason"),
-            "tx_hash": n.get("tx_hash"),
+            "title": n.get("title") or n.get("market_title"),
         })
     if not rows:
         return 0

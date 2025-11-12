@@ -17,15 +17,12 @@ class ClosedPositionOut(BaseModel):
     user_pk: int
     market_pk: int
     side: str
+    title: Optional[str] = None
     quantity: Optional[float] = None
     entry_avg_price: Optional[float] = None
     exit_avg_price: Optional[float] = None
     realized_pnl: Optional[float] = None
-    fees_total: Optional[float] = None
-    opened_at: Optional[datetime] = None
     closed_at: Optional[datetime] = None
-    close_reason: Optional[str] = None
-    tx_hash: Optional[str] = None
 
 
 class ActivePositionOut(BaseModel):
@@ -61,6 +58,7 @@ class ActivityOut(BaseModel):
     user_pk: int
     ts: datetime
     type: str
+    title: Optional[str] = None
     side: Optional[str] = None
     asset: Optional[str] = None
     condition_id: Optional[str] = None
@@ -137,6 +135,7 @@ class SimActivePositionDbOut(BaseModel):
 
 class SimClosedPositionDbOut(BaseModel):
     """Single closed position from sim DB"""
+    title: Optional[str] = None
     asset: str
     quantity: float
     avg_cost: float
@@ -152,6 +151,7 @@ class SimTradeOut(BaseModel):
     leader_address: Optional[str]
     ts: datetime
     side: str
+    title: Optional[str] = None
     asset: str
     price: float
     size: float

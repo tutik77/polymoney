@@ -493,6 +493,7 @@ async def follow_user_realtime_sim(
                             fee=0.0,
                             notional=trade_value_usdc,
                             exec_type=exec_type,
+                            title=(metadata_cache.get(str(asset)) or {}).get("title"),
                             source_tx=src_tx,
                             source_ts=src_ts,
                         )

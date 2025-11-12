@@ -120,6 +120,8 @@ async def settle_resolved_positions(
                     closed_positions_raw = await client.fetch_user_closed_positions(
                         leader_address,
                         max_total=100,
+                        sort_by="timestamp",
+                        sort_direction="DESC",
                     )
                 except Exception as e:
                     log.error("settlement_fetch_error", leader=leader_address, error=str(e)[:200])
@@ -184,6 +186,7 @@ async def settle_resolved_positions(
                         realized_pnl=realized_pnl,
                         closed_at=now,
                         leader_address=leader_address,
+                        title=pos.title,
                     )
                     
                     # Delete active position

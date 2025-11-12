@@ -48,6 +48,7 @@ async def insert_activities(user: User, items: List[Dict[str, Any]]) -> int:
             "price": norm.get("price"),
             "size": norm.get("size"),
             "fee": norm.get("fee"),
+            "title": norm.get("title"),
             "tx_hash": norm.get("tx_hash"),
         }
         rows.append(payload)

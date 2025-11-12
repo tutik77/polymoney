@@ -32,6 +32,8 @@ async def ingest_top_leaderboard_once(limit: int | None = None, active_max_total
                     entry.user_id,
                     page_size=settings.closed_positions_page_size,
                     max_total=closed_max_total,
+                    sort_by="timestamp",
+                    sort_direction="DESC",
                 )
                 active_raw_coro = client.fetch_user_active_positions(
                     entry.user_id,

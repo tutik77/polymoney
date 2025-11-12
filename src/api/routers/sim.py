@@ -201,6 +201,7 @@ async def sim_db_positions_closed(sim_user: str, limit: int = 1000, offset: int 
     rows = await db_get_sim_closed_positions(session, sim_user, limit=limit, offset=offset)
     return [
         SimClosedPositionDbOut(
+            title=r.title,
             asset=r.asset,
             quantity=float(r.quantity),
             avg_cost=float(r.avg_cost),
@@ -223,6 +224,7 @@ async def sim_db_trades(sim_user: str, limit: int = 100, offset: int = 0, sessio
             leader_address=r.leader_address,
             ts=r.ts,
             side=r.side,
+            title=r.title,
             asset=r.asset,
             price=float(r.price),
             size=float(r.size),

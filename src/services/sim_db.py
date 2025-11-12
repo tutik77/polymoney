@@ -75,6 +75,7 @@ async def record_sim_trade(
     fee: float,
     notional: float,
     exec_type: Optional[str],
+    title: Optional[str],
     source_tx: Optional[str],
     source_ts: Optional[datetime],
 ) -> None:
@@ -105,6 +106,7 @@ async def record_sim_trade(
             fee=fee,
             notional=notional,
             exec_type=exec_type,
+            title=title,
             source_tx=source_tx,
             source_ts=source_ts,
         )
@@ -259,6 +261,7 @@ async def insert_sim_closed_position(
     realized_pnl: float,
     closed_at: datetime,
     leader_address: Optional[str],
+    title: Optional[str],
 ) -> None:
     session.add(
         SimClosedPosition(
@@ -270,6 +273,7 @@ async def insert_sim_closed_position(
             realized_pnl=realized_pnl,
             closed_at=closed_at,
             leader_address=leader_address,
+            title=title,
         )
     )
 

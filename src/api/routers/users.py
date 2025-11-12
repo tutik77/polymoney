@@ -55,15 +55,12 @@ async def get_closed_positions(address: str, session: AsyncSession = Depends(get
             "user_pk": r.user_pk,
             "market_pk": r.market_pk,
             "side": r.side,
+            "title": r.title,
             "quantity": float(r.quantity) if r.quantity is not None else None,
             "entry_avg_price": float(r.entry_avg_price) if r.entry_avg_price is not None else None,
             "exit_avg_price": float(r.exit_avg_price) if r.exit_avg_price is not None else None,
             "realized_pnl": float(r.realized_pnl) if r.realized_pnl is not None else None,
-            "fees_total": float(r.fees_total) if r.fees_total is not None else None,
-            "opened_at": r.opened_at,
             "closed_at": r.closed_at,
-            "close_reason": r.close_reason,
-            "tx_hash": r.tx_hash,
         })
         for r in rows
     ]
@@ -115,6 +112,7 @@ async def get_activities(address: str, session: AsyncSession = Depends(get_db_se
             "user_pk": r.user_pk,
             "ts": r.ts,
             "type": r.type,
+            "title": r.title,
             "side": r.side,
             "asset": r.asset,
             "condition_id": r.condition_id,
