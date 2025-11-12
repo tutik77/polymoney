@@ -183,3 +183,10 @@ class SettlementResultOut(BaseModel):
     total_cash_change: float
     positions: list[SettledPositionOut]
 
+
+class SimLeaderStatsOut(BaseModel):
+    """Aggregated stats per tracked leader for a sim user"""
+    leader_address: str
+    active_count: int
+    closed_count: int
+    realized_pnl: float

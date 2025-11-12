@@ -13,6 +13,7 @@ from ...services.sim_db import (
     get_sim_active_positions as db_get_sim_active_positions,
     get_sim_closed_positions as db_get_sim_closed_positions,
     get_sim_trades as db_get_sim_trades,
+    get_sim_leader_stats as db_get_sim_leader_stats,
 )
 from ..schemas import (
     SimRealtimeStartRequest,
@@ -23,6 +24,7 @@ from ..schemas import (
     SimClosedPositionDbOut,
     SettlementResultOut,
     SettledPositionOut,
+    SimLeaderStatsOut,
 )
 from ..dependencies import get_db_session
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -237,6 +239,19 @@ async def sim_db_trades(sim_user: str, limit: int = 100, offset: int = 0, sessio
         for r in rows
     ]
 
+
+@router.get("/db/{sim_user}/leaders/stats", response_model=list[SimLeaderStatsOut])
+async def sim_db_leader_stats(sim_user: str, session: AsyncSession = Depends(get_db_session)) -> list[SimLeaderStatsOut]:
+    rows = await db_get_sim_leader_stats(session, sim_user)
+    return [
+        SimLeaderStatsOut(
+            leader_address=r["leader_address"],
+            active_count=int(r["active_count"]),
+            closed_count=int(r["closed_count"]),
+            realized_pnl=float(r["realized_pnl"]),
+        )
+        for r in rows
+    ]
 
 @router.post("/{sim_user}/settle")
 async def settle_positions(sim_user: str, force_settle_after_days: int = 2) -> dict:

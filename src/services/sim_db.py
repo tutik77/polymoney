@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from sqlalchemy import select, update, delete
+from sqlalchemy import select, update, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -336,4 +336,67 @@ async def get_sim_trades(session: AsyncSession, sim_user: str, limit: int = 1000
         )
     ).scalars().all()
 
+
+async def get_sim_leader_stats(session: AsyncSession, sim_user: str) -> list[dict]:
+    """
+    Aggregate per-leader stats for a sim_user:
+      - active_count: number of active positions for the leader
+      - closed_count: number of closed positions for the leader
+      - realized_pnl: sum of realized_pnl from closed positions for the leader
+    Leaders with NULL address are excluded.
+    """
+    # Active positions count per leader
+    active_result = await session.execute(
+        select(
+            SimActivePosition.leader_address,
+            func.count().label("active_count"),
+        )
+        .where(
+            SimActivePosition.sim_user == sim_user,
+            SimActivePosition.leader_address.isnot(None),
+        )
+        .group_by(SimActivePosition.leader_address)
+    )
+    active_counts = {
+        r.leader_address: int(r.active_count) for r in active_result.all()
+    }
+
+    # Closed positions count and realized PnL per leader
+    closed_result = await session.execute(
+        select(
+            SimClosedPosition.leader_address,
+            func.count().label("closed_count"),
+            func.coalesce(func.sum(SimClosedPosition.realized_pnl), 0).label("realized_pnl"),
+        )
+        .where(
+            SimClosedPosition.sim_user == sim_user,
+            SimClosedPosition.leader_address.isnot(None),
+        )
+        .group_by(SimClosedPosition.leader_address)
+    )
+    closed_map = {
+        r.leader_address: {
+            "closed_count": int(r.closed_count),
+            "realized_pnl": float(r.realized_pnl or 0.0),
+        }
+        for r in closed_result.all()
+    }
+
+    # Union of leaders from active and closed
+    leaders: set[str] = set(active_counts.keys()) | set(closed_map.keys())
+
+    stats: list[dict] = []
+    for leader in sorted(leaders):
+        a = active_counts.get(leader, 0)
+        c = closed_map.get(leader, {}).get("closed_count", 0)
+        pnl = closed_map.get(leader, {}).get("realized_pnl", 0.0)
+        stats.append(
+            {
+                "leader_address": leader,
+                "active_count": a,
+                "closed_count": c,
+                "realized_pnl": pnl,
+            }
+        )
+    return stats
 
