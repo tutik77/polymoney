@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from sqlalchemy import select, update, delete, func
+from sqlalchemy import select, update, delete, func, case
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -343,6 +343,7 @@ async def get_sim_leader_stats(session: AsyncSession, sim_user: str) -> list[dic
       - active_count: number of active positions for the leader
       - closed_count: number of closed positions for the leader
       - realized_pnl: sum of realized_pnl from closed positions for the leader
+      - win_rate: wins / closed_count, where win = realized_pnl > 0
     Leaders with NULL address are excluded.
     """
     # Active positions count per leader
@@ -367,6 +368,12 @@ async def get_sim_leader_stats(session: AsyncSession, sim_user: str) -> list[dic
             SimClosedPosition.leader_address,
             func.count().label("closed_count"),
             func.coalesce(func.sum(SimClosedPosition.realized_pnl), 0).label("realized_pnl"),
+            func.sum(
+                case(
+                    (SimClosedPosition.realized_pnl > 0, 1),
+                    else_=0,
+                )
+            ).label("wins_count"),
         )
         .where(
             SimClosedPosition.sim_user == sim_user,
@@ -378,6 +385,7 @@ async def get_sim_leader_stats(session: AsyncSession, sim_user: str) -> list[dic
         r.leader_address: {
             "closed_count": int(r.closed_count),
             "realized_pnl": float(r.realized_pnl or 0.0),
+            "wins_count": int(r.wins_count or 0),
         }
         for r in closed_result.all()
     }
@@ -390,12 +398,15 @@ async def get_sim_leader_stats(session: AsyncSession, sim_user: str) -> list[dic
         a = active_counts.get(leader, 0)
         c = closed_map.get(leader, {}).get("closed_count", 0)
         pnl = closed_map.get(leader, {}).get("realized_pnl", 0.0)
+        wins = closed_map.get(leader, {}).get("wins_count", 0)
+        win_rate = (wins / c) if c > 0 else 0.0
         stats.append(
             {
                 "leader_address": leader,
                 "active_count": a,
                 "closed_count": c,
                 "realized_pnl": pnl,
+                "win_rate": win_rate,
             }
         )
     return stats

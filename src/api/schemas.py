@@ -190,3 +190,4 @@ class SimLeaderStatsOut(BaseModel):
     active_count: int
     closed_count: int
     realized_pnl: float
+    win_rate: float

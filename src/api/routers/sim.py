@@ -249,6 +249,7 @@ async def sim_db_leader_stats(sim_user: str, session: AsyncSession = Depends(get
             active_count=int(r["active_count"]),
             closed_count=int(r["closed_count"]),
             realized_pnl=float(r["realized_pnl"]),
+            win_rate=float(r.get("win_rate", 0.0)),
         )
         for r in rows
     ]
