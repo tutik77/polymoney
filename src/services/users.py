@@ -6,7 +6,9 @@ from typing import Optional, List
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import Activity, User
+from sqlalchemy import case, cast, Float, update
+
+from ..models import Activity, User, ClosedPosition
 
 
 async def get_user_by_address(session: AsyncSession, address: str) -> Optional[User]:
@@ -41,4 +43,65 @@ async def list_users(session: AsyncSession, limit: int = 100, offset: int = 0) -
         )
     ).scalars().all()
 
+async def recompute_stats_for_user(session: AsyncSession, user_pk: int) -> None:
+    """Recompute closed_positions_count and win_rate for a single user."""
+    agg = (
+        await session.execute(
+            select(
+                func.count(ClosedPosition.id),
+                (
+                    cast(
+                        func.sum(
+                            case(
+                                (ClosedPosition.realized_pnl > 0, 1),
+                                else_=0,
+                            )
+                        ),
+                        Float,
+                    )
+                    / func.nullif(func.count(ClosedPosition.id), 0)
+                ),
+            ).where(ClosedPosition.user_pk == user_pk)
+        )
+    ).one_or_none()
+    if not agg:
+        return
+    closed_count, win_rate = agg
+    await session.execute(
+        update(User)
+        .where(User.id == user_pk)
+        .values(closed_positions_count=int(closed_count or 0), win_rate=float(win_rate) if win_rate is not None else None)
+    )
 
+
+async def recompute_all_users_stats(session: AsyncSession) -> None:
+    """Recompute stats for all users that have at least one closed position."""
+    rows = (
+        await session.execute(
+            select(
+                ClosedPosition.user_pk,
+                func.count(ClosedPosition.id).label("closed_count"),
+                (
+                    cast(
+                        func.sum(
+                            case(
+                                (ClosedPosition.realized_pnl > 0, 1),
+                                else_=0,
+                            )
+                        ),
+                        Float,
+                    )
+                    / func.nullif(func.count(ClosedPosition.id), 0)
+                ).label("win_rate"),
+            ).group_by(ClosedPosition.user_pk)
+        )
+    ).mappings().all()
+    for r in rows:
+        await session.execute(
+            update(User)
+            .where(User.id == r["user_pk"])
+            .values(
+                closed_positions_count=int(r["closed_count"] or 0),
+                win_rate=float(r["win_rate"]) if r["win_rate"] is not None else None,
+            )
+        )

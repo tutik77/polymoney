@@ -10,7 +10,7 @@ from ..db import session_scope
 from ..normalizers import normalize_active_position, normalize_closed_position
 from ..polymarket_client import LeaderboardEntry, PolymarketClient
 from .positions import bulk_insert_closed_positions, bulk_upsert_active_positions, bulk_upsert_markets
-from .users import get_or_create_user
+from .users import get_or_create_user, recompute_all_users_stats
 
 
 async def ingest_top_leaderboard_once(limit: int | None = None, active_max_total: int | None = None, closed_max_total: int | None = None) -> None:
@@ -60,6 +60,10 @@ async def ingest_top_leaderboard_once(limit: int | None = None, active_max_total
                         log.error("ingest_user_error", user=entry.user_id, error=str(e)[:200])
 
         await asyncio.gather(*(process_entry(idx, entry) for idx, entry in enumerate(leaderboard, start=1)))
+
+        # Recompute aggregated user stats after ingest completes
+        async with session_scope() as session:
+            await recompute_all_users_stats(session)
 
 
 

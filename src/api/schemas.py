@@ -10,6 +10,8 @@ class UserOut(BaseModel):
     id: int
     user_id: str
     display_name: Optional[str] = None
+    closed_positions_count: int
+    win_rate: Optional[float] = None
 
 
 class ClosedPositionOut(BaseModel):

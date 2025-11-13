@@ -26,6 +26,8 @@ async def get_users(limit: int = 100, offset: int = 0, session: AsyncSession = D
             "id": r.id,
             "user_id": r.user_id,
             "display_name": r.display_name,
+            "closed_positions_count": r.closed_positions_count,
+            "win_rate": float(r.win_rate) if r.win_rate is not None else None,
         })
         for r in rows
     ]
@@ -42,7 +44,13 @@ async def _get_user(session: AsyncSession, address: str) -> User:
 @router.get("/{address}", response_model=UserOut)
 async def get_user(address: str, session: AsyncSession = Depends(get_db_session)) -> UserOut:
     user = await _get_user(session, address)
-    return UserOut.model_validate({"id": user.id, "user_id": user.user_id, "display_name": user.display_name})
+    return UserOut.model_validate({
+        "id": user.id,
+        "user_id": user.user_id,
+        "display_name": user.display_name,
+        "closed_positions_count": user.closed_positions_count,
+        "win_rate": float(user.win_rate) if user.win_rate is not None else None,
+    })
 
 
 @router.get("/{address}/closed-positions", response_model=List[ClosedPositionOut])

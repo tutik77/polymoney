@@ -17,6 +17,9 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[str] = mapped_column(String(128), unique=True, index=True)
     display_name: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    # Aggregated stats (computed from positions_closed)
+    closed_positions_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    win_rate: Mapped[Optional[float]] = mapped_column(Numeric(5, 4), nullable=True)
 
     positions: Mapped[list["ClosedPosition"]] = relationship(back_populates="user")
 
