@@ -210,3 +210,8 @@ class SimTrade(Base):
     title: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     source_tx: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)
     source_ts: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+
+    __table_args__ = (
+        # Enforce idempotency per (sim_user, leader, source_tx) when source_tx is present.
+        UniqueConstraint("sim_user", "leader_address", "source_tx", name="uq_sim_trades_source_tx"),
+    )

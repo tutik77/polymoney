@@ -226,6 +226,7 @@ async def follow_user_realtime_sim(
         buy_sim_position,
         sell_sim_position,
         get_sim_active_position_by_leader_asset,
+        insert_trade_if_new,
     )
 
     async def _loop(c: PolymarketClient) -> None:
@@ -431,6 +432,32 @@ async def follow_user_realtime_sim(
                         realized_delta: float = 0.0
                         cash_delta: float = 0.0
                         
+                        # Prepare trade payload
+                        src_ts = parse_datetime_aware(
+                            it.get("timestamp") or it.get("time") or it.get("createdAt") or it.get("blockTime")
+                        )
+                        src_tx = it.get("txHash") or it.get("transactionHash") or it.get("hash")
+                        # Insert trade first with ON CONFLICT DO NOTHING (idempotency on source_tx)
+                        inserted = await insert_trade_if_new(
+                            session,
+                            sim_user=sim_user_id,
+                            leader_address=user_address,
+                            ts=datetime.now(timezone.utc),
+                            side=side,
+                            asset=str(asset),
+                            price=exec_price,
+                            size=exec_size,
+                            fee=0.0,
+                            notional=exec_price * exec_size,
+                            exec_type=exec_type,
+                            title=(metadata_cache.get(str(asset)) or {}).get("title"),
+                            source_tx=src_tx,
+                            source_ts=src_ts,
+                        )
+                        if not inserted and src_tx:
+                            # Already processed by another worker → skip entirely
+                            continue
+
                         if side == "buy":
                             # Buy updates position and portfolio
                             # Get metadata from cache
@@ -467,7 +494,6 @@ async def follow_user_realtime_sim(
                                 continue
                             trade_value_usdc = exec_price * executed_size
                             cash_delta = trade_value_usdc
-
                         # Update global portfolio (cash and realized PnL)
                         await increment_global_portfolio(
                             session,
@@ -476,27 +502,24 @@ async def follow_user_realtime_sim(
                             realized_pnl_delta=realized_delta,
                         )
 
-                        # Record trade
-                        src_ts = parse_datetime_aware(
-                            it.get("timestamp") or it.get("time") or it.get("createdAt") or it.get("blockTime")
-                        )
-                        src_tx = it.get("txHash") or it.get("transactionHash") or it.get("hash")
-                        await record_sim_trade(
-                            session,
-                            sim_user=sim_user_id,
-                            leader_address=user_address,
-                            ts=datetime.now(timezone.utc),
-                            side=side,
-                            asset=str(asset),
-                            price=exec_price,
-                            size=executed_size,
-                            fee=0.0,
-                            notional=trade_value_usdc,
-                            exec_type=exec_type,
-                            title=(metadata_cache.get(str(asset)) or {}).get("title"),
-                            source_tx=src_tx,
-                            source_ts=src_ts,
-                        )
+                        # If source_tx is absent, still record trade (no idempotency key)
+                        if not src_tx:
+                            await record_sim_trade(
+                                session,
+                                sim_user=sim_user_id,
+                                leader_address=user_address,
+                                ts=datetime.now(timezone.utc),
+                                side=side,
+                                asset=str(asset),
+                                price=exec_price,
+                                size=executed_size,
+                                fee=0.0,
+                                notional=trade_value_usdc,
+                                exec_type=exec_type,
+                                title=(metadata_cache.get(str(asset)) or {}).get("title"),
+                                source_tx=src_tx,
+                                source_ts=src_ts,
+                            )
 
                         trades_executed += 1
                         log.info(

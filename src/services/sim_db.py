@@ -144,52 +144,44 @@ async def buy_sim_position(
     condition_id: Optional[str] = None,
 ) -> tuple[float, float]:
     """
-    Buy into a position, merging with existing if present.
+    Buy into a position atomically (UPSERT).
     Returns: (new_quantity, new_avg_cost)
     """
-    row = await get_sim_active_position_by_leader_asset(
-        session,
+    ins = pg_insert(SimActivePosition).values(
         sim_user=sim_user,
         leader_address=leader_address,
         asset=asset,
+        quantity=size,
+        avg_cost=price,
+        end_date=end_date,
+        title=title,
+        condition_id=condition_id,
     )
-    
-    if row is None:
-        # New position
-        session.add(
-            SimActivePosition(
-                sim_user=sim_user,
-                leader_address=leader_address,
-                asset=asset,
-                quantity=size,
-                avg_cost=price,
-                end_date=end_date,
-                title=title,
-                condition_id=condition_id,
+    stmt = ins.on_conflict_do_update(
+        index_elements=[
+            SimActivePosition.__table__.c.sim_user,
+            SimActivePosition.__table__.c.leader_address,
+            SimActivePosition.__table__.c.asset,
+        ],
+        set_={
+            # q_new = q_old + size
+            "quantity": SimActivePosition.quantity + ins.excluded.quantity,
+            # avg_new = (avg_old*q_old + price*size) / (q_old + size)
+            "avg_cost": (
+                (SimActivePosition.avg_cost * SimActivePosition.quantity)
+                + (ins.excluded.avg_cost * ins.excluded.quantity)
             )
-        )
-        return size, price
-    else:
-        # Merge with existing
-        old_qty = float(row.quantity)
-        old_cost = float(row.avg_cost)
-        
-        new_qty = old_qty + size
-        # Weighted average cost
-        new_avg_cost = ((old_cost * old_qty) + (price * size)) / new_qty if new_qty > 0 else price
-        
-        row.quantity = new_qty
-        row.avg_cost = new_avg_cost
-        
-        # Update metadata if provided
-        if end_date is not None:
-            row.end_date = end_date
-        if title is not None:
-            row.title = title
-        if condition_id is not None:
-            row.condition_id = condition_id
-        
-        return new_qty, new_avg_cost
+            / (SimActivePosition.quantity + ins.excluded.quantity),
+            # Update metadata only if provided in this call
+            "end_date": func.coalesce(ins.excluded.end_date, SimActivePosition.end_date),
+            "title": func.coalesce(ins.excluded.title, SimActivePosition.title),
+            "condition_id": func.coalesce(ins.excluded.condition_id, SimActivePosition.condition_id),
+        },
+    ).returning(SimActivePosition.quantity, SimActivePosition.avg_cost)
+
+    res = await session.execute(stmt)
+    q, avg = res.first()
+    return float(q), float(avg)
 
 
 async def sell_sim_position(
@@ -202,31 +194,35 @@ async def sell_sim_position(
     size: float,
 ) -> Optional[tuple[float, float, float]]:
     """
-    Sell from a position, capped by current holdings.
+    Sell from a position with row-level locking to avoid races.
     Returns: (executed_size, new_quantity, realized_pnl) or None if no position
     """
-    row = await get_sim_active_position_by_leader_asset(
-        session,
-        sim_user=sim_user,
-        leader_address=leader_address,
-        asset=asset,
+    # Lock the row to serialize concurrent updates
+    result = await session.execute(
+        select(SimActivePosition)
+        .where(
+            SimActivePosition.sim_user == sim_user,
+            SimActivePosition.leader_address == leader_address,
+            SimActivePosition.asset == asset,
+        )
+        .with_for_update()
     )
-    
+    row = result.scalar_one_or_none()
     if row is None or row.quantity <= 0:
         return None
-    
+
     held = float(row.quantity)
     avg_cost = float(row.avg_cost)
-    
-    # Cap by holdings
+
     executed_size = min(size, held)
+    if executed_size <= 0:
+        return 0.0, held, 0.0
+
     new_qty = held - executed_size
-    
-    # Calculate realized PnL
     realized_pnl = (price - avg_cost) * executed_size
-    
+
     if new_qty <= 0:
-        # Position fully closed
+        # Fully close position
         await delete_sim_active_position(
             session,
             sim_user=sim_user,
@@ -234,9 +230,8 @@ async def sell_sim_position(
             asset=asset,
         )
     else:
-        # Update remaining quantity
         row.quantity = new_qty
-    
+
     return executed_size, new_qty, realized_pnl
 
 
@@ -410,4 +405,47 @@ async def get_sim_leader_stats(session: AsyncSession, sim_user: str) -> list[dic
             }
         )
     return stats
+
+
+async def insert_trade_if_new(
+    session: AsyncSession,
+    *,
+    sim_user: str,
+    leader_address: Optional[str],
+    ts: datetime,
+    side: str,
+    asset: str,
+    price: float,
+    size: float,
+    fee: float,
+    notional: float,
+    exec_type: Optional[str],
+    title: Optional[str],
+    source_tx: Optional[str],
+    source_ts: Optional[datetime],
+) -> bool:
+    """
+    Insert trade once using ON CONFLICT DO NOTHING on uq_sim_trades_source_tx.
+    Returns True if inserted (new), False if duplicate (already processed).
+    If source_tx is NULL, inserts without constraint (caller should gate duplicates).
+    """
+    stmt = pg_insert(SimTrade.__table__).values(
+        sim_user=sim_user,
+        leader_address=leader_address,
+        ts=ts,
+        side=side,
+        asset=asset,
+        price=price,
+        size=size,
+        fee=fee,
+        notional=notional,
+        exec_type=exec_type,
+        title=title,
+        source_tx=source_tx,
+        source_ts=source_ts,
+    )
+    if source_tx:
+        stmt = stmt.on_conflict_do_nothing(constraint="uq_sim_trades_source_tx")
+    res = await session.execute(stmt)
+    return bool(getattr(res, "rowcount", 0))
 
