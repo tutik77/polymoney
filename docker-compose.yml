@@ -72,7 +72,7 @@ services:
   celery_worker:
     build: .
     restart: unless-stopped
-    command: celery -A src.celery_app worker --loglevel=info --concurrency=6
+    command: celery -A src.celery_app worker --loglevel=info --concurrency=12
     env_file:
       - .env
     environment:
