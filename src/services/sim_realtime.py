@@ -326,15 +326,18 @@ async def follow_user_realtime_sim(
                         for it in candidates
                         if (it.get("asset") or it.get("token_id") or it.get("tokenId"))
                     })
+                    # VWAP temporarily disabled: skip fetching order books to reduce API load
                     orderbooks: Dict[str, Dict[str, List[Dict[str, float]]]] = {}
-                    if unique_assets:
-                        ob_tasks = [c.fetch_order_book(asset) for asset in unique_assets]
-                        ob_results = await asyncio.gather(*ob_tasks, return_exceptions=True)
-                        for asset, res in zip(unique_assets, ob_results):
-                            if isinstance(res, Exception):
-                                orderbooks[asset] = {"bids": [], "asks": []}
-                            else:
-                                orderbooks[asset] = res  # type: ignore[assignment]
+                    # --- VWAP prefetch (disabled) ---
+                    # if unique_assets:
+                    #     ob_tasks = [c.fetch_order_book(asset) for asset in unique_assets]
+                    #     ob_results = await asyncio.gather(*ob_tasks, return_exceptions=True)
+                    #     for asset, res in zip(unique_assets, ob_results):
+                    #         if isinstance(res, Exception):
+                    #             orderbooks[asset] = {"bids": [], "asks": []}
+                    #         else:
+                    #             orderbooks[asset] = res  # type: ignore[assignment]
+                    # --- end disabled ---
 
                     best_quote_cache: Dict[str, Dict[str, Optional[float]]] = {}
 
@@ -379,8 +382,18 @@ async def follow_user_realtime_sim(
 
                         # Prefer depth-based execution (VWAP); fallback to best bid/ask with bps slippage
                         desired_size = float(size)
-                        # Try depth from cache
-                        book = orderbooks.get(str(asset)) or {"bids": [], "asks": []}
+                        # VWAP temporarily disabled — do not use order book depth
+                        book = {"bids": [], "asks": []}
+                        # --- VWAP execution (disabled) ---
+                        # # Try depth from cache
+                        # book = orderbooks.get(str(asset)) or {"bids": [], "asks": []}
+                        # if (book.get("bids") or book.get("asks")):
+                        #     vwap_price, vwap_size = _vwap_from_orderbook(side, desired_size, book)
+                        #     if vwap_price is not None and vwap_size > 0:
+                        #         exec_price = vwap_price
+                        #         exec_size = vwap_size
+                        #         exec_type = "vwap"
+                        # --- end disabled ---
                         exec_price: Optional[float] = None
                         exec_size: float = 0.0
                         exec_type: Optional[str] = None
@@ -399,28 +412,20 @@ async def follow_user_realtime_sim(
                                 )
                                 continue
 
-                        if (book.get("bids") or book.get("asks")):
-                            vwap_price, vwap_size = _vwap_from_orderbook(side, desired_size, book)
-                            if vwap_price is not None and vwap_size > 0:
-                                exec_price = vwap_price
-                                exec_size = vwap_size
-                                exec_type = "vwap"
-                        # Fallback to best quote with simple slippage
-                        if exec_price is None or exec_size <= 0:
-                            # best quote cached per asset
-                            if str(asset) not in best_quote_cache:
-                                best_quote_cache[str(asset)] = await c.fetch_best_quote_for_asset(str(asset))
-                            quotes = best_quote_cache[str(asset)]
-                            bid = quotes.get("bid")
-                            ask = quotes.get("ask")
-                            live_price = (ask if side == "buy" else bid) if (bid is not None or ask is not None) else event_price
-                            
-                            if live_price is None:
-                                continue
-                            slip = max(0.0, slippage_bps) / 10_000.0
-                            exec_price = live_price * (1.0 + slip) if side == "buy" else live_price * (1.0 - slip)
-                            exec_size = desired_size
-                            exec_type = "best"
+                        # Use best quote with simple slippage (VWAP path disabled)
+                        if str(asset) not in best_quote_cache:
+                            best_quote_cache[str(asset)] = await c.fetch_best_quote_for_asset(str(asset))
+                        quotes = best_quote_cache[str(asset)]
+                        bid = quotes.get("bid")
+                        ask = quotes.get("ask")
+                        live_price = (ask if side == "buy" else bid) if (bid is not None or ask is not None) else event_price
+                        
+                        if live_price is None:
+                            continue
+                        slip = max(0.0, slippage_bps) / 10_000.0
+                        exec_price = live_price * (1.0 + slip) if side == "buy" else live_price * (1.0 - slip)
+                        exec_size = desired_size
+                        exec_type = "best"
                         
                         # Validate
                         if exec_price is None or exec_price <= 0 or exec_size <= 0:
