@@ -36,20 +36,20 @@ celery_app.conf.update(
     worker_task_log_format="%(message)s",
 )
 
-# Periodic schedule (beat)
-try:
-    settlement_interval_minutes = int(os.getenv("SETTLEMENT_INTERVAL_MINUTES", "120"))
-    force_settle_after_days = int(os.getenv("FORCE_SETTLE_AFTER_DAYS", "2"))
-    celery_app.conf.beat_schedule = {
-        "settle-positions-all": {
-            "task": "polymoney.settle_positions_all",
-            "schedule": timedelta(minutes=settlement_interval_minutes),
-            "kwargs": {"force_settle_after_days": force_settle_after_days},
-        }
-    }
-except Exception:
-    # Fallback: no beat schedule configured
-    pass
+# Periodic schedule (beat) — disabled to keep only manual settlement
+# try:
+#     settlement_interval_minutes = int(os.getenv("SETTLEMENT_INTERVAL_MINUTES", "120"))
+#     force_settle_after_days = int(os.getenv("FORCE_SETTLE_AFTER_DAYS", "2"))
+#     celery_app.conf.beat_schedule = {
+#         "settle-positions-all": {
+#             "task": "polymoney.settle_positions_all",
+#             "schedule": timedelta(minutes=settlement_interval_minutes),
+#             "kwargs": {"force_settle_after_days": force_settle_after_days},
+#         }
+#     }
+# except Exception:
+#     # Fallback: no beat schedule configured
+#     pass
 
 from . import tasks  # noqa: E402, F401
  

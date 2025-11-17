@@ -42,12 +42,12 @@ services:
       elasticsearch:
         condition: service_healthy
 
-  celery_beat:
-    environment:
-      ELASTICSEARCH_ENABLED: "true"
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
+  # celery_beat:
+  #   environment:
+  #     ELASTICSEARCH_ENABLED: "true"
+  #   depends_on:
+  #     elasticsearch:
+  #       condition: service_healthy
 
 volumes:
   es_data:
