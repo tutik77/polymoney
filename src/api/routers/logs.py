@@ -8,8 +8,8 @@ from fastapi.responses import PlainTextResponse
 
 router = APIRouter(prefix="/logs", tags=["logs"])
 
-AllowedService = Literal["api", "celery_worker", "celery_beat"]
-ALLOWED_SERVICES: set[str] = {"api", "celery_worker", "celery_beat"}
+AllowedService = Literal["api", "celery_worker"]
+ALLOWED_SERVICES: set[str] = {"api", "celery_worker"}
 
 
 def _read_tail(path: str, max_lines: int) -> str:

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from celery import Celery
 from kombu import Exchange, Queue
-import os
-from datetime import timedelta
 
 from .config import get_settings
 from .logging_setup import configure_logging
@@ -49,21 +47,6 @@ celery_app.conf.task_routes = {
     "polymoney.settle_positions": {"queue": "settlement", "routing_key": "settlement"},
     "polymoney.settle_positions_all": {"queue": "settlement", "routing_key": "settlement"},
 }
-
-# Periodic schedule (beat) — disabled to keep only manual settlement
-# try:
-#     settlement_interval_minutes = int(os.getenv("SETTLEMENT_INTERVAL_MINUTES", "120"))
-#     force_settle_after_days = int(os.getenv("FORCE_SETTLE_AFTER_DAYS", "2"))
-#     celery_app.conf.beat_schedule = {
-#         "settle-positions-all": {
-#             "task": "polymoney.settle_positions_all",
-#             "schedule": timedelta(minutes=settlement_interval_minutes),
-#             "kwargs": {"force_settle_after_days": force_settle_after_days},
-#         }
-#     }
-# except Exception:
-#     # Fallback: no beat schedule configured
-#     pass
 
 from . import tasks  # noqa: E402, F401
  
