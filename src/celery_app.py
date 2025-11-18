@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from celery import Celery
+from kombu import Exchange, Queue
 import os
 from datetime import timedelta
 
@@ -35,6 +36,19 @@ celery_app.conf.update(
     worker_log_format="%(message)s",
     worker_task_log_format="%(message)s",
 )
+
+# Queues & routing: send settlement tasks to dedicated 'settlement' queue
+celery_app.conf.task_queues = (
+    Queue("default", Exchange("default"), routing_key="default"),
+    Queue("settlement", Exchange("settlement"), routing_key="settlement"),
+)
+celery_app.conf.task_default_queue = "default"
+celery_app.conf.task_default_exchange = "default"
+celery_app.conf.task_default_routing_key = "default"
+celery_app.conf.task_routes = {
+    "polymoney.settle_positions": {"queue": "settlement", "routing_key": "settlement"},
+    "polymoney.settle_positions_all": {"queue": "settlement", "routing_key": "settlement"},
+}
 
 # Periodic schedule (beat) — disabled to keep only manual settlement
 # try:

@@ -72,7 +72,32 @@ services:
   celery_worker:
     build: .
     restart: unless-stopped
-    command: celery -A src.celery_app worker --loglevel=info --concurrency=12
+    command: celery -A src.celery_app worker --loglevel=info --concurrency=12 -Q default
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://polymoney:polymoney@5.129.232.183:5432/polymoney
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      ELASTICSEARCH_ENABLED: ${ELASTICSEARCH_ENABLED:-false}
+      LOG_TO_FILE: "false"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery_worker_settlement:
+    build: .
+    restart: unless-stopped
+    command: celery -A src.celery_app worker --loglevel=info --concurrency=4 -Q settlement
     env_file:
       - .env
     environment:
