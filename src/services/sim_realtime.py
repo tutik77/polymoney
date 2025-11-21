@@ -228,6 +228,7 @@ async def follow_user_realtime_sim(
         buy_sim_position,
         sell_sim_position,
         get_sim_active_position_by_leader_asset,
+        get_sim_portfolio,
         insert_trade_if_new,
     )
 
