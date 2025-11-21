@@ -8,7 +8,7 @@ import random
 import aiohttp
 from aiolimiter import AsyncLimiter
 import structlog
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential, RetryError
 import orjson
 
 from .config import get_settings
@@ -258,8 +258,21 @@ class PolymarketClient:
                 "asks": data.get("asks", []),
             }
         except Exception as e:
+            real_e = e
+            if isinstance(e, RetryError):
+                real_e = e.last_attempt.exception()
+
+            err_msg = str(real_e)
+            status = None
+            if isinstance(real_e, aiohttp.ClientResponseError):
+                status = real_e.status
+                err_msg = f"Http {status}: {real_e.message}"
+
             self._log.warning(
-                "orderbook_error", token=token_id[:20], error=str(e)[:100]
+                "orderbook_error",
+                token=token_id[:20],
+                error=err_msg,
+                status=status,
             )
             return {"bids": [], "asks": []}
 
@@ -282,5 +295,20 @@ class PolymarketClient:
                 "ask": float(ask) if ask is not None else None,
             }
         except Exception as e:
-            self._log.warning("quote_error", token=token_id[:20], error=str(e)[:100])
+            real_e = e
+            if isinstance(e, RetryError):
+                real_e = e.last_attempt.exception()
+
+            err_msg = str(real_e)
+            status = None
+            if isinstance(real_e, aiohttp.ClientResponseError):
+                status = real_e.status
+                err_msg = f"Http {status}: {real_e.message}"
+
+            self._log.warning(
+                "quote_error",
+                token=token_id[:20],
+                error=err_msg,
+                status=status,
+            )
             return {"bid": None, "ask": None}
