@@ -81,6 +81,8 @@ def sim_realtime_task(
     initial_cash: float = 10_000_000.0,
     poll_interval: Optional[float] = None,
     slippage_bps: float = 0.0,
+    sizing_strategy: str = "target_profit",
+    sizing_value: float = 0.005,
 ):
     async def _run():
         await dispose_engine()
@@ -93,6 +95,8 @@ def sim_realtime_task(
                 initial_cash=initial_cash,
                 poll_interval=poll_interval,
                 slippage_bps=slippage_bps,
+                sizing_strategy=sizing_strategy,
+                sizing_value=sizing_value,
             )
         except asyncio.CancelledError:
             log.info("task_cancelled", task="sim", user=user_address, id=self.request.id)

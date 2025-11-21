@@ -202,6 +202,8 @@ async def follow_user_realtime_sim(
     slippage_bps: float = 0.0,
     sim_user_id: str = "default",
     client: Optional[PolymarketClient] = None,
+    sizing_strategy: str = "target_profit",
+    sizing_value: float = 0.005,
 ) -> None:
     """
     Follow a single user's activities and simulate copying trades at live quotes.
@@ -238,6 +240,7 @@ async def follow_user_realtime_sim(
             sim_user=sim_user_id,
             interval=interval,
             slippage_bps=slippage_bps,
+            sizing=f"{sizing_strategy}={sizing_value}",
         )
         # Ensure global portfolio exists for this sim user (only once)
         # Also ensure User row exists for the leader
@@ -424,8 +427,61 @@ async def follow_user_realtime_sim(
                             continue
                         slip = max(0.0, slippage_bps) / 10_000.0
                         exec_price = live_price * (1.0 + slip) if side == "buy" else live_price * (1.0 - slip)
-                        exec_size = desired_size
-                        exec_type = "best"
+                        
+                        # --- Event Exposure Check: Prevent adding to existing positions ---
+                        if side == "buy":
+                            # Check if we already have an active position for this asset
+                            existing_pos = await get_sim_active_position_by_leader_asset(
+                                session,
+                                sim_user_id,
+                                user_address,
+                                str(asset)
+                            )
+                            if existing_pos and existing_pos.quantity > 1e-9:
+                                log.info(
+                                    "sim_skip_duplicate_exposure", 
+                                    user=user_address, 
+                                    asset=str(asset)[:20], 
+                                    reason="already_in_position"
+                                )
+                                continue
+
+                        # --- Position Sizing Logic ---
+                        exec_size = desired_size  # default to 'exact'
+                        
+                        if side == "buy":
+                            if sizing_strategy == "target_profit":
+                                # Value 0.005 = Aim to win 0.5% of current cash
+                                p_row = await get_sim_portfolio(session, sim_user_id)
+                                current_cash = float(p_row["cash"]) if p_row else 0.0
+                                
+                                profit_target = current_cash * sizing_value
+                                # Profit per share = 1.0 - entry_price
+                                profit_per_share = 1.0 - exec_price
+                                
+                                if profit_per_share > 1e-4 and exec_price > 1e-9:
+                                    exec_size = profit_target / profit_per_share
+                                else:
+                                    exec_size = 0.0
+                            elif sizing_strategy == "variable_percent":
+                                # Placeholder for future implementation if needed
+                                pass
+                            elif sizing_strategy == "scaled_copy":
+                                # Placeholder for future implementation if needed
+                                pass
+
+                        # --- Safety Cap: Never invest more than available cash ---
+                        if sizing_strategy != "exact" and side == "buy":
+                            p_row = await get_sim_portfolio(session, sim_user_id)
+                            available_cash = float(p_row["cash"]) if p_row else 0.0
+                            cost = exec_size * exec_price
+                            if cost > available_cash:
+                                if exec_price > 1e-9:
+                                    exec_size = available_cash / exec_price
+                                else:
+                                    exec_size = 0.0
+
+                        exec_type = f"best_{sizing_strategy}"
                         
                         # Validate
                         if exec_price is None or exec_price <= 0 or exec_size <= 0:
@@ -483,22 +539,16 @@ async def follow_user_realtime_sim(
                             cash_delta = -trade_value_usdc
                             realized_delta = 0.0
                         else:
-                            # Sell with safe capping
-                            result = await sell_sim_position(
-                                session,
-                                sim_user=sim_user_id,
-                                leader_address=user_address,
-                                asset=str(asset),
-                                price=exec_price,
-                                size=exec_size,
-                            )
-                            if result is None:
-                                continue
-                            executed_size, new_quantity, realized_delta = result
-                            if executed_size <= 0:
-                                continue
-                            trade_value_usdc = exec_price * executed_size
-                            cash_delta = trade_value_usdc
+                            # SELL is temporarily disabled for strategy testing
+                            # We record the trade signal but do NOT execute the sell in portfolio
+                            executed_size = 0.0
+                            cash_delta = 0.0
+                            realized_delta = 0.0
+                            log.info("sim_sell_skip", user=user_address, asset=str(asset)[:20], reason="strategy_testing_mode")
+                            
+                            # Skip DB update for sell side since we didn't execute
+                            continue
+
                         # Update global portfolio (cash and realized PnL)
                         await increment_global_portfolio(
                             session,

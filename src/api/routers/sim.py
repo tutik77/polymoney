@@ -91,6 +91,8 @@ async def sim_realtime_start(payload: SimRealtimeStartRequest) -> dict:
                 "initial_cash": payload.initial_cash or 10_000_000.0,
                 "poll_interval": payload.poll_interval,
                 "slippage_bps": payload.slippage_bps or 0.0,
+                "sizing_strategy": payload.sizing_strategy or "target_profit",
+                "sizing_value": payload.sizing_value if payload.sizing_value is not None else 0.005,
             }
         )
         started[addr] = {"status": "started", "task_id": result.id}

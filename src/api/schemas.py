@@ -99,6 +99,8 @@ class SimRealtimeStartRequest(BaseModel):
     initial_cash: Optional[float] = 10_000_000.0
     poll_interval: Optional[float] = 60.0
     slippage_bps: Optional[float] = 0.0
+    sizing_strategy: Optional[str] = "target_profit"
+    sizing_value: Optional[float] = 0.005
     # max_trade_size: Optional[float] = None  # Optional cap on trade size in shares
 
 
