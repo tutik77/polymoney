@@ -433,9 +433,9 @@ async def follow_user_realtime_sim(
                             # Check if we already have an active position for this asset
                             existing_pos = await get_sim_active_position_by_leader_asset(
                                 session,
-                                sim_user_id,
-                                user_address,
-                                str(asset)
+                                sim_user=sim_user_id,
+                                leader_address=user_address,
+                                asset=str(asset),
                             )
                             if existing_pos and existing_pos.quantity > 1e-9:
                                 log.info(
