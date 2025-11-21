@@ -482,7 +482,8 @@ async def follow_user_realtime_sim(
                                 else:
                                     exec_size = 0.0
 
-                        exec_type = f"best_{sizing_strategy}"
+                        # Execution type marker for DB: keep short to fit VARCHAR(16)
+                        exec_type = "best"
                         
                         # Validate
                         if exec_price is None or exec_price <= 0 or exec_size <= 0:
