@@ -453,12 +453,12 @@ async def follow_user_realtime_sim(
                                 )
                             )
                             if existing_pos and existing_pos.quantity > 1e-9:
-                                log.info(
-                                    "sim_skip_duplicate_exposure",
-                                    user=user_address,
-                                    asset=str(asset)[:20],
-                                    reason="already_in_position",
-                                )
+                                # log.info(
+                                #     "sim_skip_duplicate_exposure",
+                                #     user=user_address,
+                                #     asset=str(asset)[:20],
+                                #     reason="already_in_position",
+                                # )
                                 continue
 
                         # --- Position Sizing Logic ---
