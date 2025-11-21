@@ -23,57 +23,11 @@ from .users import get_or_create_user
 
 class LruTtlSet:
     """
-    LRU+TTL set for deduplicating processed activity signatures.
-    Keeps a bounded number of keys and expires old ones by time.
+    DEPRECATED: Was used for in-memory deduplication.
+    Kept temporarily if needed, but logic is removed from main loop.
     """
-    def __init__(self, max_size: int = 20000, ttl_seconds: float = 6 * 3600.0) -> None:
-        self._store: "OrderedDict[tuple, float]" = OrderedDict()
-        self._max_size = max(1, int(max_size))
-        self._ttl = max(0.0, float(ttl_seconds))
+    pass
 
-    def _now(self) -> float:
-        return time.monotonic()
-
-    def _evict(self, now_ts: float) -> None:
-        # Evict expired entries from the oldest
-        if self._ttl > 0.0:
-            while self._store:
-                oldest_key, ts = next(iter(self._store.items()))
-                if now_ts - ts > self._ttl:
-                    self._store.pop(oldest_key, None)
-                else:
-                    break
-        # Enforce max size
-        while len(self._store) > self._max_size:
-            self._store.popitem(last=False)
-
-    def contains(self, key: tuple) -> bool:
-        now_ts = self._now()
-        ts = self._store.get(key)
-        if ts is None:
-            return False
-        if self._ttl > 0.0 and (now_ts - ts > self._ttl):
-            # Expired
-            self._store.pop(key, None)
-            return False
-        # Keep hot
-        self._store.move_to_end(key)
-        return True
-
-    def add(self, key: tuple) -> bool:
-        """
-        Add key. Returns True if newly added, False if it already existed (refreshed).
-        """
-        now_ts = self._now()
-        if key in self._store:
-            self._store.move_to_end(key)
-            self._store[key] = now_ts
-            self._evict(now_ts)
-            return False
-        self._store[key] = now_ts
-        self._store.move_to_end(key)
-        self._evict(now_ts)
-        return True
 
 @dataclass(frozen=True)
 class PositionSnapshot:
@@ -249,11 +203,6 @@ async def follow_user_realtime_sim(
             await ensure_sim_global(session, sim_user=sim_user_id, initial_cash=initial_cash)
             leader_user = await get_or_create_user(session, user_address, display_name)
         
-        # In-memory deduplication with LRU/TTL
-        dedupe_max_size = getattr(settings, "sim_dedupe_max_size", 20000)
-        dedupe_ttl_seconds = getattr(settings, "sim_dedupe_ttl_seconds", 6 * 3600.0)
-        processed_signatures = LruTtlSet(max_size=dedupe_max_size, ttl_seconds=dedupe_ttl_seconds)
-        
         # Build metadata cache from leader's active positions (done once at startup)
         metadata_cache: Dict[str, Dict[str, Any]] = {}
         try:
@@ -356,18 +305,6 @@ async def follow_user_realtime_sim(
                         asset = it.get("asset") or it.get("token_id") or it.get("tokenId")
                         size_v = it.get("size") if it.get("size") is not None else it.get("amount")
                         price_v = it.get("price") if it.get("price") is not None else it.get("avgPrice")
-                        
-                        # Create signature for deduplication
-                        # Use tx_hash if available, otherwise composite key
-                        if tx_hash:
-                            signature = ("tx", tx_hash)
-                        else:
-                            signature = ("composite", ts, side, asset, size_v, price_v)
-                        
-                        # Skip if already processed (within TTL/LRU window)
-                        if processed_signatures.contains(signature):
-                            continue
-                        processed_signatures.add(signature)
                         
                         if side not in {"buy", "sell"}:
                             continue

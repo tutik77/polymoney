@@ -49,9 +49,9 @@ class Settings:
     # Elasticsearch
     elasticsearch_hosts: str
     elasticsearch_enabled: bool
-    # Simulator dedup
-    sim_dedupe_max_size: int
-    sim_dedupe_ttl_seconds: float
+    # Automatic settlement
+    settlement_interval_minutes: int
+    force_settle_after_days: int
 
 
 def get_settings() -> Settings:
@@ -88,8 +88,8 @@ def get_settings() -> Settings:
         celery_result_backend=os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/0"),
         elasticsearch_hosts=os.getenv("ELASTICSEARCH_HOSTS", "http://localhost:9200"),
         elasticsearch_enabled=os.getenv("ELASTICSEARCH_ENABLED", "false").lower() == "true",
-        sim_dedupe_max_size=int(os.getenv("SIM_DEDUPE_MAX_SIZE", "20000")),
-        sim_dedupe_ttl_seconds=float(os.getenv("SIM_DEDUPE_TTL_SECONDS", str(6 * 3600))),
+        settlement_interval_minutes=int(os.getenv("SETTLEMENT_INTERVAL_MINUTES", "480")),
+        force_settle_after_days=int(os.getenv("FORCE_SETTLE_AFTER_DAYS", "3")),
     )
 
 

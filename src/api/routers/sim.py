@@ -41,7 +41,8 @@ async def sim_realtime_start(payload: SimRealtimeStartRequest) -> dict:
     # Build a set of running/queued realtime sim keys to avoid duplicates:
     # key format: f"{sim_user}:{address_lower}"
     sim_user = payload.sim_user or "default"
-    inspector = celery_app.control.inspect()
+    # Increase timeout to 3.0s for reliable duplicate checking
+    inspector = celery_app.control.inspect(timeout=3.0)
     existing_keys: set[str] = set()
     existing_ids: Dict[str, str] = {}
     def _collect(task_list):
@@ -102,7 +103,8 @@ async def sim_realtime_start(payload: SimRealtimeStartRequest) -> dict:
 
 @router.delete("/realtime/stop/{sim_user}/{address}")
 async def sim_realtime_stop(sim_user: str, address: str) -> dict:
-    inspector = celery_app.control.inspect()
+    # Increase timeout to 3.0s (default 1.0s) to avoid missing busy/laggy workers
+    inspector = celery_app.control.inspect(timeout=3.0)
     active_tasks = inspector.active() or {}
     addr_l = (address or "").lower()
     for worker, tasks in active_tasks.items():
@@ -125,7 +127,8 @@ async def sim_realtime_stop_default(address: str) -> dict:
 
 @router.get("/realtime")
 async def sim_realtime_list() -> dict:
-    inspector = celery_app.control.inspect()
+    # Increase timeout to 3.0s (default 1.0s) to avoid missing busy/laggy workers
+    inspector = celery_app.control.inspect(timeout=3.0)
     active_tasks = inspector.active() or {}
     
     running = {}

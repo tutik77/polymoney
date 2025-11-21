@@ -23,7 +23,7 @@ async def trigger_ingest_once(payload: IngestOnceRequest | None = None) -> dict:
 
 @router.delete("/ingest/once")
 async def stop_ingest_once() -> dict:
-    inspector = celery_app.control.inspect()
+    inspector = celery_app.control.inspect(timeout=3.0)
     active_tasks = inspector.active() or {}
     
     cancelled_tasks = []
@@ -57,7 +57,7 @@ async def start_follow(address: str, payload: FollowRequest | None = None) -> di
 
 @router.delete("/activities/follow/{address}")
 async def stop_follow(address: str) -> dict:
-    inspector = celery_app.control.inspect()
+    inspector = celery_app.control.inspect(timeout=3.0)
     active_tasks = inspector.active() or {}
     
     for worker, tasks in active_tasks.items():
@@ -73,7 +73,7 @@ async def stop_follow(address: str) -> dict:
 
 @router.get("/activities/follow")
 async def list_following() -> dict:
-    inspector = celery_app.control.inspect()
+    inspector = celery_app.control.inspect(timeout=3.0)
     active_tasks = inspector.active() or {}
     
     running = {}

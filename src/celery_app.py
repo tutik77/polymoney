@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import timedelta
+
 from celery import Celery
 from kombu import Exchange, Queue
 
@@ -33,6 +35,10 @@ celery_app.conf.update(
     # Make Celery's own log formatter minimal (keep only our message)
     worker_log_format="%(message)s",
     worker_task_log_format="%(message)s",
+    # Memory optimization
+    result_expires=3600,  # Results expire after 1 hour
+    task_compression="gzip",  # Compress task arguments
+    result_compression="gzip",  # Compress task results
 )
 
 # Queues & routing: send settlement tasks to dedicated 'settlement' queue
@@ -46,6 +52,15 @@ celery_app.conf.task_default_routing_key = "default"
 celery_app.conf.task_routes = {
     "polymoney.settle_positions": {"queue": "settlement", "routing_key": "settlement"},
     "polymoney.settle_positions_all": {"queue": "settlement", "routing_key": "settlement"},
+}
+
+celery_app.conf.beat_schedule = {
+    "settle-all-regularly": {
+        "task": "polymoney.settle_positions_all",
+        "schedule": timedelta(minutes=settings.settlement_interval_minutes),
+        "kwargs": {"force_settle_after_days": settings.force_settle_after_days},
+        "options": {"queue": "settlement"},
+    },
 }
 
 from . import tasks  # noqa: E402, F401
