@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
@@ -9,7 +8,10 @@ from .utils.datetime import parse_datetime_aware
 
 def normalize_activity(raw: Dict[str, Any]) -> Dict[str, Any]:
     ts = parse_datetime_aware(
-        raw.get("timestamp") or raw.get("time") or raw.get("createdAt") or raw.get("blockTime")
+        raw.get("timestamp")
+        or raw.get("time")
+        or raw.get("createdAt")
+        or raw.get("blockTime")
     )
     side = raw.get("side") or raw.get("action")
     a_type = raw.get("type") or ("trade" if side in {"buy", "sell"} else None)
@@ -17,7 +19,9 @@ def normalize_activity(raw: Dict[str, Any]) -> Dict[str, Any]:
     cond = raw.get("conditionId") or raw.get("condition_id")
     price = raw.get("price") or raw.get("avgPrice")
     size = raw.get("size") or raw.get("amount")
-    fee = raw.get("fee") or raw.get("fees") or raw.get("takerFee") or raw.get("makerFee")
+    fee = (
+        raw.get("fee") or raw.get("fees") or raw.get("takerFee") or raw.get("makerFee")
+    )
     txh = raw.get("txHash") or raw.get("transactionHash") or raw.get("hash")
     return {
         "ts": ts,
@@ -38,7 +42,9 @@ def normalize_closed_position(raw: Dict[str, Any]) -> Dict[str, Any]:
         return parse_datetime_aware(val)
 
     return {
-        "market_external_id": raw.get("conditionId") or raw.get("marketId") or raw.get("market_id"),
+        "market_external_id": raw.get("conditionId")
+        or raw.get("marketId")
+        or raw.get("market_id"),
         "market_slug": raw.get("marketSlug") or raw.get("slug") or raw.get("eventSlug"),
         "market_title": raw.get("marketTitle") or raw.get("title"),
         "title": raw.get("marketTitle") or raw.get("title"),
@@ -56,7 +62,9 @@ def normalize_active_position(raw: Dict[str, Any]) -> Dict[str, Any]:
     end_dt = None
     if isinstance(raw.get("endDate"), str):
         try:
-            end_dt = datetime.strptime(raw["endDate"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            end_dt = datetime.strptime(raw["endDate"], "%Y-%m-%d").replace(
+                tzinfo=timezone.utc
+            )
         except Exception:
             end_dt = None
 
@@ -91,5 +99,3 @@ __all__ = [
     "normalize_closed_position",
     "normalize_active_position",
 ]
-
-

@@ -16,17 +16,18 @@ class ElasticsearchHandler(logging.Handler):
         self.hosts = hosts.split(",")
         self._client = None
         self._failed = False
-    
+
     def _get_client(self):
         if self._client is None and not self._failed:
             try:
                 from elasticsearch import Elasticsearch
+
                 self._client = Elasticsearch(self.hosts, request_timeout=5)
             except Exception as e:
                 self._failed = True
                 print(f"Failed to initialize Elasticsearch client: {e}")
         return self._client
-    
+
     def emit(self, record: logging.LogRecord) -> None:
         if self._failed:
             return
@@ -34,7 +35,7 @@ class ElasticsearchHandler(logging.Handler):
             client = self._get_client()
             if client is None:
                 return
-            
+
             doc = {
                 "timestamp": record.created,
                 "level": record.levelname,
@@ -44,10 +45,10 @@ class ElasticsearchHandler(logging.Handler):
                 "function": record.funcName,
                 "line": record.lineno,
             }
-            
+
             if hasattr(record, "event_dict"):
                 doc.update(record.event_dict)
-            
+
             client.index(
                 index=f"polymoney-logs-{int(record.created // 86400)}",
                 document=doc,
@@ -61,11 +62,13 @@ class StructlogToElasticsearch:
         self.handler = ElasticsearchHandler(hosts)
         self._root_logger = logging.getLogger()
         self._root_logger.addHandler(self.handler)
-    
+
     def __call__(self, logger: Any, method_name: str, event_dict: dict) -> dict:
         record = logging.LogRecord(
             name=logger.name if hasattr(logger, "name") else "structlog",
-            level=getattr(logging, event_dict.get("level", "INFO").upper(), logging.INFO),
+            level=getattr(
+                logging, event_dict.get("level", "INFO").upper(), logging.INFO
+            ),
             pathname="",
             lineno=0,
             msg=event_dict.get("event", ""),
@@ -115,19 +118,23 @@ def configure_logging() -> None:
     ]
 
     final_processors = shared_processors.copy()
-    
+
     if settings.elasticsearch_enabled:
         try:
-            final_processors.append(StructlogToElasticsearch(settings.elasticsearch_hosts))
+            final_processors.append(
+                StructlogToElasticsearch(settings.elasticsearch_hosts)
+            )
         except Exception as e:
             print(f"Elasticsearch logging disabled due to error: {e}")
     # Emit to file via stdlib if configured
     if file_handler is not None:
+
         class StructlogToFile:
             def __init__(self, handler: logging.Handler):
                 self.handler = handler
                 root = logging.getLogger()
                 root.addHandler(handler)
+
             def __call__(self, logger: Any, method_name: str, event_dict: dict) -> dict:
                 # Render JSON line for easier parsing
                 try:
@@ -136,7 +143,9 @@ def configure_logging() -> None:
                     msg = str(event_dict)
                 record = logging.LogRecord(
                     name=logger.name if hasattr(logger, "name") else "structlog",
-                    level=getattr(logging, event_dict.get("level", "INFO").upper(), logging.INFO),
+                    level=getattr(
+                        logging, event_dict.get("level", "INFO").upper(), logging.INFO
+                    ),
                     pathname="",
                     lineno=0,
                     msg=msg,
@@ -148,6 +157,7 @@ def configure_logging() -> None:
                 except Exception:
                     pass
                 return event_dict
+
         final_processors.append(StructlogToFile(file_handler))
 
     final_processors.append(structlog.dev.ConsoleRenderer(colors=False))

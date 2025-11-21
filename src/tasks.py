@@ -33,7 +33,7 @@ def ingest_leaderboard_task(
             closed_max_total=closed_max_total,
         )
         await dispose_engine()  # clean up after finishing
-    
+
     asyncio.run(_run())
     log.info("task_done", task="ingest", id=self.request.id)
     return {"status": "completed", "task_id": self.request.id}
@@ -58,16 +58,18 @@ def follow_user_activities_task(
                 bootstrap=bootstrap,
             )
         except asyncio.CancelledError:
-            log.info("task_cancelled", task="follow", user=user_address, id=self.request.id)
+            log.info(
+                "task_cancelled", task="follow", user=user_address, id=self.request.id
+            )
             raise
         finally:
             await dispose_engine()
-    
+
     try:
         asyncio.run(_run())
     except (asyncio.CancelledError, SoftTimeLimitExceeded):
         return {"status": "cancelled", "user": user_address, "task_id": self.request.id}
-    
+
     log.info("task_done", task="follow", user=user_address, id=self.request.id)
     return {"status": "completed", "user": user_address, "task_id": self.request.id}
 
@@ -99,17 +101,19 @@ def sim_realtime_task(
                 sizing_value=sizing_value,
             )
         except asyncio.CancelledError:
-            log.info("task_cancelled", task="sim", user=user_address, id=self.request.id)
+            log.info(
+                "task_cancelled", task="sim", user=user_address, id=self.request.id
+            )
             raise
         finally:
             await dispose_engine()
-    
+
     try:
         asyncio.run(_run())
     except (asyncio.CancelledError, SoftTimeLimitExceeded):
         # Normalize Celery soft timeouts and explicit revokes as "cancelled"
         return {"status": "cancelled", "user": user_address, "task_id": self.request.id}
-    
+
     log.info("task_done", task="sim", user=user_address, id=self.request.id)
     return {"status": "completed", "user": user_address, "task_id": self.request.id}
 
@@ -132,11 +136,18 @@ def settle_positions_task(
             "total_pnl": result.total_pnl,
             "total_cash_change": result.total_cash_change,
         }
-    
+
     result = asyncio.run(_run())
     # Best-effort cleanup outside loop isn't needed here since _run disposes engine
-    log.info("task_done", task="settle", sim_user=sim_user, id=self.request.id, **result)
-    return {"status": "completed", "sim_user": sim_user, "task_id": self.request.id, **result}
+    log.info(
+        "task_done", task="settle", sim_user=sim_user, id=self.request.id, **result
+    )
+    return {
+        "status": "completed",
+        "sim_user": sim_user,
+        "task_id": self.request.id,
+        **result,
+    }
 
 
 @celery_app.task(name="polymoney.settle_positions_all", bind=True)
@@ -148,14 +159,22 @@ def settle_positions_all_task(
         await dispose_engine()
         try:
             await ensure_schema()
-        # Discover simulators from global portfolios
+            # Discover simulators from global portfolios
             from .db import session_scope
             from .models import SimPortfolioGlobal
+
             sim_users: list[str] = []
             async with session_scope() as session:
-                rows = await session.execute(select(SimPortfolioGlobal.sim_user).distinct())
+                rows = await session.execute(
+                    select(SimPortfolioGlobal.sim_user).distinct()
+                )
                 sim_users = [r[0] for r in rows.all() if r and r[0]]
-            totals = {"settled_count": 0, "total_pnl": 0.0, "total_cash_change": 0.0, "sim_users": sim_users}
+            totals = {
+                "settled_count": 0,
+                "total_pnl": 0.0,
+                "total_cash_change": 0.0,
+                "sim_users": sim_users,
+            }
             for su in sim_users or ["default"]:
                 try:
                     res = await settle_resolved_positions(
@@ -170,8 +189,7 @@ def settle_positions_all_task(
             return totals
         finally:
             await dispose_engine()
-    
+
     result = asyncio.run(_run())
     log.info("task_done", task="settle_all", id=self.request.id, **result)
     return {"status": "completed", "task_id": self.request.id, **result}
-

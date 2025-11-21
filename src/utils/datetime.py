@@ -33,5 +33,3 @@ def parse_datetime_aware(value: Any) -> Optional[datetime]:
 
 
 __all__ = ["parse_datetime_aware"]
-
-

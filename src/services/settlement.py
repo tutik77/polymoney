@@ -8,7 +8,6 @@ from typing import Dict, List, Optional
 
 import structlog
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import session_scope
 from ..models import SimActivePosition
@@ -23,6 +22,7 @@ from .sim_db import (
 @dataclass
 class SettledPosition:
     """Details of a settled position."""
+
     asset: str
     leader_address: str
     quantity: float
@@ -37,6 +37,7 @@ class SettledPosition:
 @dataclass
 class SettlementResult:
     """Result of settlement operation."""
+
     sim_user: str
     settled_count: int
     total_pnl: float
@@ -51,7 +52,7 @@ async def settle_resolved_positions(
 ) -> SettlementResult:
     """
     Settle resolved positions for a simulator.
-    
+
     Process:
     1. Find SimActivePosition where end_date <= NOW()
     2. Group by leader_address
@@ -60,35 +61,32 @@ async def settle_resolved_positions(
        - If found in leader's closed positions with curPrice = 1.0 or 0.0 → resolve
        - If end_date > force_settle_after_days ago → force settle at avg_cost
     5. Update balances and move to closed positions
-    
+
     Args:
         sim_user: Simulator user ID
         force_settle_after_days: Days after end_date to force settle (default: 2)
-    
+
     Returns:
         SettlementResult with details of settled positions
     """
     log = structlog.get_logger()
     now = datetime.now(timezone.utc)
     force_settle_threshold = now - timedelta(days=force_settle_after_days)
-    
+
     settled_positions: List[SettledPosition] = []
     total_pnl = 0.0
     total_cash_change = 0.0
-    
+
     async with session_scope() as session:
         # Get active positions where end_date has passed
-        stmt = (
-            select(SimActivePosition)
-            .where(
-                SimActivePosition.sim_user == sim_user,
-                SimActivePosition.end_date.isnot(None),
-                SimActivePosition.end_date <= now,
-            )
+        stmt = select(SimActivePosition).where(
+            SimActivePosition.sim_user == sim_user,
+            SimActivePosition.end_date.isnot(None),
+            SimActivePosition.end_date <= now,
         )
         result = await session.execute(stmt)
         active_positions = list(result.scalars().all())
-        
+
         if not active_positions:
             return SettlementResult(
                 sim_user=sim_user,
@@ -97,9 +95,9 @@ async def settle_resolved_positions(
                 total_cash_change=0.0,
                 positions=[],
             )
-        
+
         log.info("settlement_start", sim_user=sim_user, positions=len(active_positions))
-        
+
         # Group by leader
         positions_by_leader: Dict[str, List[SimActivePosition]] = {}
         for pos in active_positions:
@@ -107,13 +105,13 @@ async def settle_resolved_positions(
             if leader not in positions_by_leader:
                 positions_by_leader[leader] = []
             positions_by_leader[leader].append(pos)
-        
+
         # Process each leader's positions
         async with PolymarketClient() as client:
             for leader_address, positions in positions_by_leader.items():
                 if leader_address == "unknown":
                     continue
-                
+
                 # Fetch leader's closed positions (limited to recent 150)
                 # Since we run settlement daily, recent positions should be sufficient
                 try:
@@ -124,9 +122,13 @@ async def settle_resolved_positions(
                         sort_direction="DESC",
                     )
                 except Exception as e:
-                    log.error("settlement_fetch_error", leader=leader_address, error=str(e)[:200])
+                    log.error(
+                        "settlement_fetch_error",
+                        leader=leader_address,
+                        error=str(e)[:200],
+                    )
                     continue
-                
+
                 # Build index: asset -> closed position data
                 resolved_by_asset: Dict[str, Dict] = {}
                 for closed in closed_positions_raw:
@@ -143,17 +145,16 @@ async def settle_resolved_positions(
                                 }
                         except (ValueError, TypeError):
                             continue
-                
-                
+
                 for pos in positions:
                     asset = pos.asset
                     quantity = float(pos.quantity)
                     avg_cost = float(pos.avg_cost)
                     end_date = pos.end_date
-                    
+
                     payout: Optional[float] = None
                     settlement_type: str = ""
-                    
+
                     if asset in resolved_by_asset:
                         payout = resolved_by_asset[asset]["payout"]
                         settlement_type = "resolved"
@@ -162,11 +163,11 @@ async def settle_resolved_positions(
                         settlement_type = "expired"
                     else:
                         continue
-                    
+
                     # Calculate settlement
                     redemption_cash = payout * quantity
                     realized_pnl = (payout - avg_cost) * quantity
-                    
+
                     # Update global portfolio
                     await increment_global_portfolio(
                         session,
@@ -174,7 +175,7 @@ async def settle_resolved_positions(
                         cash_delta=redemption_cash,
                         realized_pnl_delta=realized_pnl,
                     )
-                    
+
                     # Create closed position record
                     await insert_sim_closed_position(
                         session,
@@ -188,7 +189,7 @@ async def settle_resolved_positions(
                         leader_address=leader_address,
                         title=pos.title,
                     )
-                    
+
                     # Delete active position
                     await delete_sim_active_position(
                         session,
@@ -196,7 +197,7 @@ async def settle_resolved_positions(
                         leader_address=leader_address,
                         asset=asset,
                     )
-                    
+
                     # Track results
                     settled_positions.append(
                         SettledPosition(
@@ -213,7 +214,7 @@ async def settle_resolved_positions(
                     )
                     total_pnl += realized_pnl
                     total_cash_change += redemption_cash
-    
+
     result = SettlementResult(
         sim_user=sim_user,
         settled_count=len(settled_positions),
@@ -221,8 +222,13 @@ async def settle_resolved_positions(
         total_cash_change=total_cash_change,
         positions=settled_positions,
     )
-    
-    log.info("settlement_done", sim_user=sim_user, count=result.settled_count, pnl=total_pnl, cash=total_cash_change)
-    
-    return result
 
+    log.info(
+        "settlement_done",
+        sim_user=sim_user,
+        count=result.settled_count,
+        pnl=total_pnl,
+        cash=total_cash_change,
+    )
+
+    return result

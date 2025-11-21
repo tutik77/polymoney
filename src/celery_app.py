@@ -51,7 +51,10 @@ celery_app.conf.task_default_exchange = "default"
 celery_app.conf.task_default_routing_key = "default"
 celery_app.conf.task_routes = {
     "polymoney.settle_positions": {"queue": "settlement", "routing_key": "settlement"},
-    "polymoney.settle_positions_all": {"queue": "settlement", "routing_key": "settlement"},
+    "polymoney.settle_positions_all": {
+        "queue": "settlement",
+        "routing_key": "settlement",
+    },
 }
 
 celery_app.conf.beat_schedule = {
@@ -64,4 +67,3 @@ celery_app.conf.beat_schedule = {
 }
 
 from . import tasks  # noqa: E402, F401
- 

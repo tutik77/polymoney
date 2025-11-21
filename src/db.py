@@ -3,7 +3,12 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.pool import NullPool
 
 from .config import get_settings
@@ -48,7 +53,6 @@ async def session_scope() -> AsyncIterator[AsyncSession]:
         await session.close()
 
 
-
 async def ensure_schema() -> None:
     """Create all tables if they do not exist."""
     async_engine = get_engine()
@@ -69,5 +73,3 @@ async def dispose_engine() -> None:
     finally:
         _engine = None
         _session_factory = None
-
-

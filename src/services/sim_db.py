@@ -7,27 +7,50 @@ from sqlalchemy import select, update, delete, func, case
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from ..models import SimPortfolio, SimPortfolioGlobal, SimActivePosition, SimClosedPosition, SimTrade
+from ..models import (
+    SimPortfolio,
+    SimPortfolioGlobal,
+    SimActivePosition,
+    SimClosedPosition,
+    SimTrade,
+)
 
 
-async def upsert_sim_portfolio(session: AsyncSession, sim_user: str, leader_address: Optional[str], cash: float, realized_pnl: float) -> None:
+async def upsert_sim_portfolio(
+    session: AsyncSession,
+    sim_user: str,
+    leader_address: Optional[str],
+    cash: float,
+    realized_pnl: float,
+) -> None:
     row = (
         await session.execute(
             select(SimPortfolio).where(
-                SimPortfolio.sim_user == sim_user, SimPortfolio.leader_address == leader_address
+                SimPortfolio.sim_user == sim_user,
+                SimPortfolio.leader_address == leader_address,
             )
         )
     ).scalar_one_or_none()
     now_dt = datetime.now(timezone.utc)
     if row is None:
-        session.add(SimPortfolio(sim_user=sim_user, leader_address=leader_address, cash=cash, realized_pnl=realized_pnl, updated_at=now_dt))
+        session.add(
+            SimPortfolio(
+                sim_user=sim_user,
+                leader_address=leader_address,
+                cash=cash,
+                realized_pnl=realized_pnl,
+                updated_at=now_dt,
+            )
+        )
     else:
         row.cash = cash
         row.realized_pnl = realized_pnl
         row.updated_at = now_dt
 
 
-async def ensure_sim_global(session: AsyncSession, *, sim_user: str, initial_cash: float) -> None:
+async def ensure_sim_global(
+    session: AsyncSession, *, sim_user: str, initial_cash: float
+) -> None:
     now_dt = datetime.now(timezone.utc)
     # Idempotent insert with ON CONFLICT DO NOTHING to avoid race conditions
     stmt = (
@@ -38,7 +61,9 @@ async def ensure_sim_global(session: AsyncSession, *, sim_user: str, initial_cas
             realized_pnl=0.0,
             updated_at=now_dt,
         )
-        .on_conflict_do_nothing(index_elements=[SimPortfolioGlobal.__table__.c.sim_user])
+        .on_conflict_do_nothing(
+            index_elements=[SimPortfolioGlobal.__table__.c.sim_user]
+        )
     )
     await session.execute(stmt)
 
@@ -173,9 +198,13 @@ async def buy_sim_position(
             )
             / (SimActivePosition.quantity + ins.excluded.quantity),
             # Update metadata only if provided in this call
-            "end_date": func.coalesce(ins.excluded.end_date, SimActivePosition.end_date),
+            "end_date": func.coalesce(
+                ins.excluded.end_date, SimActivePosition.end_date
+            ),
             "title": func.coalesce(ins.excluded.title, SimActivePosition.title),
-            "condition_id": func.coalesce(ins.excluded.condition_id, SimActivePosition.condition_id),
+            "condition_id": func.coalesce(
+                ins.excluded.condition_id, SimActivePosition.condition_id
+            ),
         },
     ).returning(SimActivePosition.quantity, SimActivePosition.avg_cost)
 
@@ -235,7 +264,9 @@ async def sell_sim_position(
     return executed_size, new_qty, realized_pnl
 
 
-async def delete_sim_active_position(session: AsyncSession, *, sim_user: str, leader_address: Optional[str], asset: str) -> None:
+async def delete_sim_active_position(
+    session: AsyncSession, *, sim_user: str, leader_address: Optional[str], asset: str
+) -> None:
     await session.execute(
         delete(SimActivePosition).where(
             SimActivePosition.sim_user == sim_user,
@@ -275,10 +306,13 @@ async def insert_sim_closed_position(
 
 # ---- Queries for API ----
 
+
 async def get_sim_portfolio(session: AsyncSession, sim_user: str) -> Optional[dict]:
     # Prefer global aggregate row if present
     glob = (
-        await session.execute(select(SimPortfolioGlobal).where(SimPortfolioGlobal.sim_user == sim_user))
+        await session.execute(
+            select(SimPortfolioGlobal).where(SimPortfolioGlobal.sim_user == sim_user)
+        )
     ).scalar_one_or_none()
     if glob:
         return {
@@ -289,47 +323,76 @@ async def get_sim_portfolio(session: AsyncSession, sim_user: str) -> Optional[di
         }
     # Fallback to legacy per-leader aggregation
     rows = (
-        await session.execute(select(SimPortfolio).where(SimPortfolio.sim_user == sim_user))
-    ).scalars().all()
+        (
+            await session.execute(
+                select(SimPortfolio).where(SimPortfolio.sim_user == sim_user)
+            )
+        )
+        .scalars()
+        .all()
+    )
     if not rows:
         return None
     cash_sum = sum(float(r.cash) for r in rows)
     realized_sum = sum(float(r.realized_pnl) for r in rows)
     updated_at = max(r.updated_at for r in rows)
-    return {"sim_user": sim_user, "cash": cash_sum, "realized_pnl": realized_sum, "updated_at": updated_at}
+    return {
+        "sim_user": sim_user,
+        "cash": cash_sum,
+        "realized_pnl": realized_sum,
+        "updated_at": updated_at,
+    }
 
 
-async def get_sim_active_positions(session: AsyncSession, sim_user: str) -> List[SimActivePosition]:
+async def get_sim_active_positions(
+    session: AsyncSession, sim_user: str
+) -> List[SimActivePosition]:
     rows = (
-        await session.execute(
-            select(SimActivePosition).where(SimActivePosition.sim_user == sim_user)
+        (
+            await session.execute(
+                select(SimActivePosition).where(SimActivePosition.sim_user == sim_user)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return list(rows)
 
 
-async def get_sim_closed_positions(session: AsyncSession, sim_user: str, limit: int = 1000, offset: int = 0) -> List[SimClosedPosition]:
+async def get_sim_closed_positions(
+    session: AsyncSession, sim_user: str, limit: int = 1000, offset: int = 0
+) -> List[SimClosedPosition]:
     return (
-        await session.execute(
-            select(SimClosedPosition)
-            .where(SimClosedPosition.sim_user == sim_user)
-            .order_by(SimClosedPosition.closed_at.desc())
-            .limit(limit)
-            .offset(offset)
+        (
+            await session.execute(
+                select(SimClosedPosition)
+                .where(SimClosedPosition.sim_user == sim_user)
+                .order_by(SimClosedPosition.closed_at.desc())
+                .limit(limit)
+                .offset(offset)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
 
-async def get_sim_trades(session: AsyncSession, sim_user: str, limit: int = 1000, offset: int = 0) -> List[SimTrade]:
+async def get_sim_trades(
+    session: AsyncSession, sim_user: str, limit: int = 1000, offset: int = 0
+) -> List[SimTrade]:
     return (
-        await session.execute(
-            select(SimTrade)
-            .where(SimTrade.sim_user == sim_user)
-            .order_by(SimTrade.ts.desc())
-            .limit(limit)
-            .offset(offset)
+        (
+            await session.execute(
+                select(SimTrade)
+                .where(SimTrade.sim_user == sim_user)
+                .order_by(SimTrade.ts.desc())
+                .limit(limit)
+                .offset(offset)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
 
 async def get_sim_leader_stats(session: AsyncSession, sim_user: str) -> list[dict]:
@@ -353,16 +416,16 @@ async def get_sim_leader_stats(session: AsyncSession, sim_user: str) -> list[dic
         )
         .group_by(SimActivePosition.leader_address)
     )
-    active_counts = {
-        r.leader_address: int(r.active_count) for r in active_result.all()
-    }
+    active_counts = {r.leader_address: int(r.active_count) for r in active_result.all()}
 
     # Closed positions count and realized PnL per leader
     closed_result = await session.execute(
         select(
             SimClosedPosition.leader_address,
             func.count().label("closed_count"),
-            func.coalesce(func.sum(SimClosedPosition.realized_pnl), 0).label("realized_pnl"),
+            func.coalesce(func.sum(SimClosedPosition.realized_pnl), 0).label(
+                "realized_pnl"
+            ),
             func.sum(
                 case(
                     (SimClosedPosition.realized_pnl > 0, 1),
@@ -448,4 +511,3 @@ async def insert_trade_if_new(
         stmt = stmt.on_conflict_do_nothing(constraint="uq_sim_trades_source_tx")
     res = await session.execute(stmt)
     return bool(getattr(res, "rowcount", 0))
-

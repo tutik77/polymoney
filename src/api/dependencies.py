@@ -13,6 +13,3 @@ async def get_db_session() -> AsyncIterator[AsyncSession]:
         yield session
     finally:
         await session.close()
-
-
-

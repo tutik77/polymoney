@@ -4,10 +4,8 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-import asyncio
 import random
 import aiohttp
-import math
 from aiolimiter import AsyncLimiter
 import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -34,7 +32,9 @@ class PolymarketClient:
         self._current_rps: float = float(settings.requests_per_second)
         # Never allow limiter capacity < 1; clamp min RPS to 1.0
         self._min_rps: float = max(1.0, float(settings.min_requests_per_second))
-        self._max_rps: float = max(self._current_rps, float(settings.max_requests_per_second))
+        self._max_rps: float = max(
+            self._current_rps, float(settings.max_requests_per_second)
+        )
         self._adapt_up_successes: int = max(1, int(settings.adapt_up_successes))
         self._adapt_down_factor: float = max(0.1, float(settings.adapt_down_factor))
         self._adapt_up_factor: float = max(1.0, float(settings.adapt_up_factor))
@@ -69,7 +69,9 @@ class PolymarketClient:
     @retry(wait=wait_exponential(min=1, max=30), stop=stop_after_attempt(8))
     async def _get_json(self, url: str, params: Optional[Dict[str, Any]] = None) -> Any:
         async with self._limiter:
-            async with self._session.get(url, params=params, headers={"accept": "application/json"}) as resp:
+            async with self._session.get(
+                url, params=params, headers={"accept": "application/json"}
+            ) as resp:
                 if resp.status == 429:
                     retry_after = resp.headers.get("Retry-After")
                     try:
@@ -117,7 +119,9 @@ class PolymarketClient:
                 user_addr = item.get("proxyWallet") or item.get("user")
                 name = item.get("userName") or item.get("name")
                 if user_addr:
-                    entries.append(LeaderboardEntry(user_id=user_addr, display_name=name))
+                    entries.append(
+                        LeaderboardEntry(user_id=user_addr, display_name=name)
+                    )
             offset += len(data)
         return entries
 
@@ -134,16 +138,22 @@ class PolymarketClient:
         offset = 0
         if page_size is None:
             page_size = get_settings().closed_positions_page_size
-        progress_step = 500
-        next_log_at = progress_step
+        # progress_step = 500
+        # next_log_at = progress_step
         while True:
             if max_total is not None and len(results) >= max_total:
                 break
-            effective_limit = page_size if max_total is None else max(1, min(page_size, max_total - len(results)))
+            effective_limit = (
+                page_size
+                if max_total is None
+                else max(1, min(page_size, max_total - len(results)))
+            )
             params = {
                 "user": user_id,
                 "sortBy": (sort_by if sort_by is not None else "realizedpnl"),
-                "sortDirection": (sort_direction if sort_direction is not None else "DESC"),
+                "sortDirection": (
+                    sort_direction if sort_direction is not None else "DESC"
+                ),
                 "limit": effective_limit,
                 "offset": offset,
             }
@@ -175,7 +185,11 @@ class PolymarketClient:
         while True:
             if max_total is not None and len(results) >= max_total:
                 break
-            effective_limit = page_size if max_total is None else max(1, min(page_size, max_total - len(results)))
+            effective_limit = (
+                page_size
+                if max_total is None
+                else max(1, min(page_size, max_total - len(results)))
+            )
             params = {
                 "user": user_id,
                 "sortBy": "CURRENT",
@@ -194,7 +208,12 @@ class PolymarketClient:
             offset += len(data)
         return results
 
-    async def fetch_user_activities(self, user_id: str, page_size: Optional[int] = None, max_total: Optional[int] = None) -> List[Dict[str, Any]]:
+    async def fetch_user_activities(
+        self,
+        user_id: str,
+        page_size: Optional[int] = None,
+        max_total: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
         results: List[Dict[str, Any]] = []
         offset = 0
         if page_size is None:
@@ -202,7 +221,11 @@ class PolymarketClient:
         while True:
             if max_total is not None and len(results) >= max_total:
                 break
-            effective_limit = page_size if max_total is None else max(1, min(page_size, max_total - len(results)))
+            effective_limit = (
+                page_size
+                if max_total is None
+                else max(1, min(page_size, max_total - len(results)))
+            )
             params = {
                 "user": user_id,
                 "limit": effective_limit,
@@ -219,7 +242,9 @@ class PolymarketClient:
             #     self._log.info("fetch_progress", user=user_id, count=len(results))
         return results
 
-    async def fetch_order_book(self, token_id: str) -> Dict[str, List[Dict[str, float]]]:
+    async def fetch_order_book(
+        self, token_id: str
+    ) -> Dict[str, List[Dict[str, float]]]:
         """Fetch order book (bids/asks) for a token."""
         url = f"{self._clob_api}/book"
         params = {"token_id": token_id}
@@ -233,10 +258,14 @@ class PolymarketClient:
                 "asks": data.get("asks", []),
             }
         except Exception as e:
-            self._log.warning("orderbook_error", token=token_id[:20], error=str(e)[:100])
+            self._log.warning(
+                "orderbook_error", token=token_id[:20], error=str(e)[:100]
+            )
             return {"bids": [], "asks": []}
 
-    async def fetch_best_quote_for_asset(self, token_id: str) -> Dict[str, Optional[float]]:
+    async def fetch_best_quote_for_asset(
+        self, token_id: str
+    ) -> Dict[str, Optional[float]]:
         url = f"{self._clob_api}/midpoint"
         params = {"token_id": token_id}
         try:

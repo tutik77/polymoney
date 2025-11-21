@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Dict
 
 from fastapi import APIRouter, HTTPException, Depends
-from celery.result import AsyncResult
 
 from ...tasks import sim_realtime_task, settle_positions_task
 from ...celery_app import celery_app
@@ -22,8 +21,6 @@ from ..schemas import (
     SimTradeOut,
     SimActivePositionDbOut,
     SimClosedPositionDbOut,
-    SettlementResultOut,
-    SettledPositionOut,
     SimLeaderStatsOut,
 )
 from ..dependencies import get_db_session
@@ -45,6 +42,7 @@ async def sim_realtime_start(payload: SimRealtimeStartRequest) -> dict:
     inspector = celery_app.control.inspect(timeout=3.0)
     existing_keys: set[str] = set()
     existing_ids: Dict[str, str] = {}
+
     def _collect(task_list):
         for t in task_list or []:
             if t.get("name") == "polymoney.sim_realtime":
@@ -56,6 +54,7 @@ async def sim_realtime_start(payload: SimRealtimeStartRequest) -> dict:
                     existing_keys.add(key)
                     if t.get("id"):
                         existing_ids[key] = t["id"]
+
     try:
         active = inspector.active() or {}
         for _, tasks in active.items():
@@ -82,7 +81,10 @@ async def sim_realtime_start(payload: SimRealtimeStartRequest) -> dict:
         addr_l = (addr or "").lower()
         key = f"{sim_user}:{addr_l}"
         if key in existing_keys:
-            started[addr] = {"status": "already_running", "task_id": existing_ids.get(key)}
+            started[addr] = {
+                "status": "already_running",
+                "task_id": existing_ids.get(key),
+            }
             continue
         result = sim_realtime_task.apply_async(
             kwargs={
@@ -93,7 +95,9 @@ async def sim_realtime_start(payload: SimRealtimeStartRequest) -> dict:
                 "poll_interval": payload.poll_interval,
                 "slippage_bps": payload.slippage_bps or 0.0,
                 "sizing_strategy": payload.sizing_strategy or "target_profit",
-                "sizing_value": payload.sizing_value if payload.sizing_value is not None else 0.005,
+                "sizing_value": payload.sizing_value
+                if payload.sizing_value is not None
+                else 0.005,
             }
         )
         started[addr] = {"status": "started", "task_id": result.id}
@@ -113,10 +117,10 @@ async def sim_realtime_stop(sim_user: str, address: str) -> dict:
                 task_args = task.get("kwargs", {})
                 t_addr = (task_args.get("user_address") or "").lower()
                 t_sim = task_args.get("sim_user_id", "default")
-                if (t_addr == addr_l and t_sim == sim_user):
+                if t_addr == addr_l and t_sim == sim_user:
                     celery_app.control.revoke(task["id"], terminate=True)
                     return {"status": "cancelled", "task_id": task["id"]}
-    
+
     return {"status": "not_running"}
 
 
@@ -130,7 +134,7 @@ async def sim_realtime_list() -> dict:
     # Increase timeout to 3.0s (default 1.0s) to avoid missing busy/laggy workers
     inspector = celery_app.control.inspect(timeout=3.0)
     active_tasks = inspector.active() or {}
-    
+
     running = {}
     for worker, tasks in active_tasks.items():
         for task in tasks:
@@ -141,7 +145,7 @@ async def sim_realtime_list() -> dict:
                 if address:
                     key = f"{sim_user}:{address}"
                     running[key] = {"task_id": task["id"], "worker": worker}
-    
+
     return {"tasks": running}
 
 
@@ -155,7 +159,10 @@ async def sim_realtime_portfolios() -> dict[str, SimPortfolioOut]:
             user=s.user,
             cash=s.cash,
             realized_pnl=s.realized_pnl,
-            positions=[SimPositionOut(asset=p.asset, quantity=p.quantity, avg_cost=p.avg_cost) for p in s.positions],
+            positions=[
+                SimPositionOut(asset=p.asset, quantity=p.quantity, avg_cost=p.avg_cost)
+                for p in s.positions
+            ],
             updated_at=s.updated_at,
         )
     return out
@@ -165,28 +172,40 @@ async def sim_realtime_portfolios() -> dict[str, SimPortfolioOut]:
 async def sim_realtime_portfolio(address: str) -> SimPortfolioOut:
     s = get_sim_snapshot(address)
     if not s:
-        raise HTTPException(status_code=404, detail="simulation not running for this address")
+        raise HTTPException(
+            status_code=404, detail="simulation not running for this address"
+        )
     return SimPortfolioOut(
         user=s.user,
         cash=s.cash,
         realized_pnl=s.realized_pnl,
-        positions=[SimPositionOut(asset=p.asset, quantity=p.quantity, avg_cost=p.avg_cost) for p in s.positions],
+        positions=[
+            SimPositionOut(asset=p.asset, quantity=p.quantity, avg_cost=p.avg_cost)
+            for p in s.positions
+        ],
         updated_at=s.updated_at,
     )
 
 
 # ---- DB-backed simulated portfolio ----
 
+
 @router.get("/db/{sim_user}/portfolio")
-async def sim_db_portfolio(sim_user: str, session: AsyncSession = Depends(get_db_session)) -> dict:
+async def sim_db_portfolio(
+    sim_user: str, session: AsyncSession = Depends(get_db_session)
+) -> dict:
     row = await db_get_sim_portfolio(session, sim_user)
     if not row:
         raise HTTPException(status_code=404, detail="sim portfolio not found")
     return row
 
 
-@router.get("/db/{sim_user}/positions/active", response_model=list[SimActivePositionDbOut])
-async def sim_db_positions_active(sim_user: str, session: AsyncSession = Depends(get_db_session)) -> list[SimActivePositionDbOut]:
+@router.get(
+    "/db/{sim_user}/positions/active", response_model=list[SimActivePositionDbOut]
+)
+async def sim_db_positions_active(
+    sim_user: str, session: AsyncSession = Depends(get_db_session)
+) -> list[SimActivePositionDbOut]:
     rows = await db_get_sim_active_positions(session, sim_user)
     return [
         SimActivePositionDbOut(
@@ -203,9 +222,18 @@ async def sim_db_positions_active(sim_user: str, session: AsyncSession = Depends
     ]
 
 
-@router.get("/db/{sim_user}/positions/closed", response_model=list[SimClosedPositionDbOut])
-async def sim_db_positions_closed(sim_user: str, limit: int = 1000, offset: int = 0, session: AsyncSession = Depends(get_db_session)) -> list[SimClosedPositionDbOut]:
-    rows = await db_get_sim_closed_positions(session, sim_user, limit=limit, offset=offset)
+@router.get(
+    "/db/{sim_user}/positions/closed", response_model=list[SimClosedPositionDbOut]
+)
+async def sim_db_positions_closed(
+    sim_user: str,
+    limit: int = 1000,
+    offset: int = 0,
+    session: AsyncSession = Depends(get_db_session),
+) -> list[SimClosedPositionDbOut]:
+    rows = await db_get_sim_closed_positions(
+        session, sim_user, limit=limit, offset=offset
+    )
     return [
         SimClosedPositionDbOut(
             title=r.title,
@@ -222,7 +250,12 @@ async def sim_db_positions_closed(sim_user: str, limit: int = 1000, offset: int 
 
 
 @router.get("/db/{sim_user}/trades", response_model=list[SimTradeOut])
-async def sim_db_trades(sim_user: str, limit: int = 100, offset: int = 0, session: AsyncSession = Depends(get_db_session)) -> list[SimTradeOut]:
+async def sim_db_trades(
+    sim_user: str,
+    limit: int = 100,
+    offset: int = 0,
+    session: AsyncSession = Depends(get_db_session),
+) -> list[SimTradeOut]:
     rows = await db_get_sim_trades(session, sim_user, limit=limit, offset=offset)
     return [
         SimTradeOut(
@@ -246,7 +279,9 @@ async def sim_db_trades(sim_user: str, limit: int = 100, offset: int = 0, sessio
 
 
 @router.get("/db/{sim_user}/leaders/stats", response_model=list[SimLeaderStatsOut])
-async def sim_db_leader_stats(sim_user: str, session: AsyncSession = Depends(get_db_session)) -> list[SimLeaderStatsOut]:
+async def sim_db_leader_stats(
+    sim_user: str, session: AsyncSession = Depends(get_db_session)
+) -> list[SimLeaderStatsOut]:
     rows = await db_get_sim_leader_stats(session, sim_user)
     return [
         SimLeaderStatsOut(
@@ -259,6 +294,7 @@ async def sim_db_leader_stats(sim_user: str, session: AsyncSession = Depends(get
         for r in rows
     ]
 
+
 @router.post("/{sim_user}/settle")
 async def settle_positions(sim_user: str, force_settle_after_days: int = 2) -> dict:
     result = settle_positions_task.apply_async(
@@ -268,5 +304,3 @@ async def settle_positions(sim_user: str, force_settle_after_days: int = 2) -> d
         }
     )
     return {"status": "scheduled", "task_id": result.id}
-
-

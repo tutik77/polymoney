@@ -43,5 +43,3 @@ async def tail_logs(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"failed to read log: {e}")
     return PlainTextResponse(content)
-
-

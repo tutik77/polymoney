@@ -1,20 +1,16 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
-from starlette.middleware.base import BaseHTTPMiddleware
 import asyncio
 import structlog
 
 from ..db import ensure_schema
 from ..logging_setup import configure_logging
-from ..config import get_settings
 from .routers import admin, health, sim, trading, users, logs
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Polymoney API", version="0.1.0")
-
-    settings = get_settings()
 
     app.include_router(health.router)
     app.include_router(users.router)
@@ -52,6 +48,3 @@ if __name__ == "__main__":  # pragma: no cover - manual run
     import uvicorn
 
     uvicorn.run("src.api.main:app", host="0.0.0.0", port=8000, reload=False)
-
-
-

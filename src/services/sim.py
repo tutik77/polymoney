@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 import structlog
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import ensure_schema, session_scope
 from ..models import ClosedPosition, User
@@ -57,7 +56,9 @@ def _pnl_from_closed_position(p: ClosedPosition) -> Tuple[float, float, float]:
 async def _fetch_top_leaderboard(limit: int) -> List[LeaderboardEntry]:
     async with PolymarketClient() as client:
         # Default: month/PNL/overall — matches current ingest
-        return await client.fetch_leaderboard_top(limit=limit, time_period="month", order_by="PNL", category="overall")
+        return await client.fetch_leaderboard_top(
+            limit=limit, time_period="month", order_by="PNL", category="overall"
+        )
 
 
 async def _ensure_users_present(entries: List[LeaderboardEntry]) -> None:
@@ -72,7 +73,9 @@ async def _ensure_users_present(entries: List[LeaderboardEntry]) -> None:
                 await get_or_create_user(session, e.user_id, e.display_name)
 
 
-async def run_closed_positions_dry_run(top_n: int = 10, initial_cash: float = 10_000_000.0, *, refresh_ingest: bool = True) -> DryRunSummary:
+async def run_closed_positions_dry_run(
+    top_n: int = 10, initial_cash: float = 10_000_000.0, *, refresh_ingest: bool = True
+) -> DryRunSummary:
     """
     Simple dry-run using closed positions of top-N leaderboard users.
 
@@ -88,7 +91,9 @@ async def run_closed_positions_dry_run(top_n: int = 10, initial_cash: float = 10
 
     # Optionally refresh local DB from the network to have fresh closed positions
     if refresh_ingest:
-        await ingest_top_leaderboard_once(limit=top_n, active_max_total=None, closed_max_total=10_000)
+        await ingest_top_leaderboard_once(
+            limit=top_n, active_max_total=None, closed_max_total=10_000
+        )
 
     # Pull top-N addresses (from network to avoid relying on stale DB ranking)
     entries = await _fetch_top_leaderboard(limit=top_n)
@@ -104,7 +109,9 @@ async def run_closed_positions_dry_run(top_n: int = 10, initial_cash: float = 10
             user_row: Optional[User] = await get_user_by_address(session, e.user_id)
             if not user_row:
                 continue
-            closed: List[ClosedPosition] = await get_closed_positions_for_user(session, user_row.id)
+            closed: List[ClosedPosition] = await get_closed_positions_for_user(
+                session, user_row.id
+            )
             gross_sum = 0.0
             fees_sum = 0.0
             net_sum = 0.0
@@ -141,12 +148,3 @@ async def run_closed_positions_dry_run(top_n: int = 10, initial_cash: float = 10
     )
     log.info("sim_dry_done", users=top_n, pnl=total_net, cash=final_cash)
     return summary
-
-
-
-
-
-
-
-
-

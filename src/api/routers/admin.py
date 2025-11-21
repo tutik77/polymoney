@@ -25,14 +25,14 @@ async def trigger_ingest_once(payload: IngestOnceRequest | None = None) -> dict:
 async def stop_ingest_once() -> dict:
     inspector = celery_app.control.inspect(timeout=3.0)
     active_tasks = inspector.active() or {}
-    
+
     cancelled_tasks = []
     for worker, tasks in active_tasks.items():
         for task in tasks:
             if task.get("name") == "polymoney.ingest_leaderboard":
                 celery_app.control.revoke(task["id"], terminate=True)
                 cancelled_tasks.append({"task_id": task["id"], "worker": worker})
-    
+
     if cancelled_tasks:
         return {"status": "cancelled", "tasks": cancelled_tasks}
     return {"status": "not_running"}
@@ -40,10 +40,14 @@ async def stop_ingest_once() -> dict:
 
 @router.post("/activities/follow/{address}")
 async def start_follow(address: str, payload: FollowRequest | None = None) -> dict:
-    display_name = payload.display_name if payload and payload.display_name is not None else None
-    poll_interval = payload.poll_interval if payload and payload.poll_interval is not None else None
+    display_name = (
+        payload.display_name if payload and payload.display_name is not None else None
+    )
+    poll_interval = (
+        payload.poll_interval if payload and payload.poll_interval is not None else None
+    )
     bootstrap = payload.bootstrap if payload and payload.bootstrap is not None else True
-    
+
     result = follow_user_activities_task.apply_async(
         kwargs={
             "user_address": address,
@@ -59,7 +63,7 @@ async def start_follow(address: str, payload: FollowRequest | None = None) -> di
 async def stop_follow(address: str) -> dict:
     inspector = celery_app.control.inspect(timeout=3.0)
     active_tasks = inspector.active() or {}
-    
+
     for worker, tasks in active_tasks.items():
         for task in tasks:
             if task.get("name") == "polymoney.follow_user_activities":
@@ -67,7 +71,7 @@ async def stop_follow(address: str) -> dict:
                 if task_args.get("user_address") == address:
                     celery_app.control.revoke(task["id"], terminate=True)
                     return {"status": "cancelled", "task_id": task["id"]}
-    
+
     return {"status": "not_running"}
 
 
@@ -75,7 +79,7 @@ async def stop_follow(address: str) -> dict:
 async def list_following() -> dict:
     inspector = celery_app.control.inspect(timeout=3.0)
     active_tasks = inspector.active() or {}
-    
+
     running = {}
     for worker, tasks in active_tasks.items():
         for task in tasks:
@@ -84,7 +88,7 @@ async def list_following() -> dict:
                 address = task_args.get("user_address")
                 if address:
                     running[address] = {"task_id": task["id"], "worker": worker}
-    
+
     return {"tasks": running}
 
 
@@ -96,6 +100,3 @@ async def get_task_status(task_id: str) -> dict:
         "status": result.status,
         "result": result.result if result.ready() else None,
     }
-
-
-

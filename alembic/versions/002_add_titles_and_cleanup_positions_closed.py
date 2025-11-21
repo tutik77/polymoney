@@ -18,10 +18,19 @@ depends_on = None
 
 def upgrade() -> None:
     # Add title columns
-    op.add_column("activities", sa.Column("title", sa.String(length=1024), nullable=True))
-    op.add_column("sim_trades", sa.Column("title", sa.String(length=1024), nullable=True))
-    op.add_column("sim_positions_closed", sa.Column("title", sa.String(length=1024), nullable=True))
-    op.add_column("positions_closed", sa.Column("title", sa.String(length=1024), nullable=True))
+    op.add_column(
+        "activities", sa.Column("title", sa.String(length=1024), nullable=True)
+    )
+    op.add_column(
+        "sim_trades", sa.Column("title", sa.String(length=1024), nullable=True)
+    )
+    op.add_column(
+        "sim_positions_closed",
+        sa.Column("title", sa.String(length=1024), nullable=True),
+    )
+    op.add_column(
+        "positions_closed", sa.Column("title", sa.String(length=1024), nullable=True)
+    )
 
     # Drop obsolete columns from positions_closed
     with op.batch_alter_table("positions_closed") as batch_op:
@@ -47,8 +56,12 @@ def downgrade() -> None:
         batch_op.drop_constraint("uq_positions_closed_dedupe", type_="unique")
         # Recreate the old columns
         batch_op.add_column(sa.Column("tx_hash", sa.String(length=128), nullable=True))
-        batch_op.add_column(sa.Column("close_reason", sa.String(length=32), nullable=True))
-        batch_op.add_column(sa.Column("opened_at", sa.DateTime(timezone=True), nullable=True))
+        batch_op.add_column(
+            sa.Column("close_reason", sa.String(length=32), nullable=True)
+        )
+        batch_op.add_column(
+            sa.Column("opened_at", sa.DateTime(timezone=True), nullable=True)
+        )
         batch_op.add_column(sa.Column("fees_total", sa.Numeric(38, 8), nullable=True))
         # Restore original unique constraint
         batch_op.create_unique_constraint(
@@ -61,5 +74,3 @@ def downgrade() -> None:
     op.drop_column("sim_positions_closed", "title")
     op.drop_column("sim_trades", "title")
     op.drop_column("activities", "title")
-
-

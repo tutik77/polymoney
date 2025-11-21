@@ -20,7 +20,9 @@ def upgrade() -> None:
     # Add aggregated stats columns to users
     op.add_column(
         "users",
-        sa.Column("closed_positions_count", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column(
+            "closed_positions_count", sa.Integer(), nullable=False, server_default="0"
+        ),
     )
     op.add_column(
         "users",
@@ -31,5 +33,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_column("users", "win_rate")
     op.drop_column("users", "closed_positions_count")
-
-

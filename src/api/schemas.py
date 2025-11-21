@@ -92,8 +92,10 @@ class IngestOnceRequest(BaseModel):
 
 # Simulator schemas
 
+
 class SimRealtimeStartRequest(BaseModel):
     """Request to start realtime simulation for user(s)"""
+
     users: list[str] = []
     sim_user: Optional[str] = "default"
     initial_cash: Optional[float] = 10_000_000.0
@@ -106,6 +108,7 @@ class SimRealtimeStartRequest(BaseModel):
 
 class SimPositionOut(BaseModel):
     """Single position in realtime sim snapshot"""
+
     asset: str
     quantity: float
     avg_cost: float
@@ -113,11 +116,14 @@ class SimPositionOut(BaseModel):
 
 class SimPortfolioOut(BaseModel):
     """Realtime sim portfolio snapshot"""
+
     user: str
     cash: float
     realized_pnl: float
     positions: list[SimPositionOut]
     updated_at: datetime
+
+
 class SimPortfolioGlobalOut(BaseModel):
     sim_user: str
     cash: float
@@ -127,6 +133,7 @@ class SimPortfolioGlobalOut(BaseModel):
 
 class SimActivePositionDbOut(BaseModel):
     """Single active position in the sim DB (per leader + asset)"""
+
     sim_user: str
     leader_address: Optional[str]
     asset: str
@@ -139,6 +146,7 @@ class SimActivePositionDbOut(BaseModel):
 
 class SimClosedPositionDbOut(BaseModel):
     """Single closed position from sim DB"""
+
     title: Optional[str] = None
     asset: str
     quantity: float
@@ -168,6 +176,7 @@ class SimTradeOut(BaseModel):
 
 class SettledPositionOut(BaseModel):
     """Details about a single position that was settled"""
+
     asset: str
     leader_address: str
     quantity: float
@@ -181,6 +190,7 @@ class SettledPositionOut(BaseModel):
 
 class SettlementResultOut(BaseModel):
     """Result of calling the settlement endpoint"""
+
     sim_user: str
     settled_count: int
     total_pnl: float
@@ -190,6 +200,7 @@ class SettlementResultOut(BaseModel):
 
 class SimLeaderStatsOut(BaseModel):
     """Aggregated stats per tracked leader for a sim user"""
+
     leader_address: str
     active_count: int
     closed_count: int

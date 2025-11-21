@@ -55,15 +55,28 @@ async def insert_activities(user: User, items: List[Dict[str, Any]]) -> int:
     if not rows:
         return 0
     async with session_scope() as session:
-        stmt = pg_insert(Activity).values(rows).on_conflict_do_nothing(constraint="uq_activities_user_tx")
+        stmt = (
+            pg_insert(Activity)
+            .values(rows)
+            .on_conflict_do_nothing(constraint="uq_activities_user_tx")
+        )
         await session.execute(stmt)
     return len(rows)
 
 
-async def follow_user_loop(user_address: str, display_name: Optional[str], poll_interval: Optional[float] = None, bootstrap: bool = False) -> None:
+async def follow_user_loop(
+    user_address: str,
+    display_name: Optional[str],
+    poll_interval: Optional[float] = None,
+    bootstrap: bool = False,
+) -> None:
     log = structlog.get_logger()
     settings = get_settings()
-    interval = poll_interval if poll_interval is not None else settings.activities_poll_interval_seconds
+    interval = (
+        poll_interval
+        if poll_interval is not None
+        else settings.activities_poll_interval_seconds
+    )
 
     async with session_scope() as session:
         user = await get_or_create_user(session, user_address, display_name)
@@ -83,8 +96,12 @@ async def follow_user_loop(user_address: str, display_name: Optional[str], poll_
             raw0_sorted = sorted(
                 raw0,
                 key=lambda it: parse_datetime_aware(
-                    it.get("timestamp") or it.get("time") or it.get("createdAt") or it.get("blockTime")
-                ) or datetime.fromtimestamp(0, tz=timezone.utc),
+                    it.get("timestamp")
+                    or it.get("time")
+                    or it.get("createdAt")
+                    or it.get("blockTime")
+                )
+                or datetime.fromtimestamp(0, tz=timezone.utc),
             )
             if raw0_sorted:
                 saved0 = await insert_activities(user, raw0_sorted)
@@ -116,9 +133,13 @@ async def follow_user_loop(user_address: str, display_name: Optional[str], poll_
                     page_size=settings.activities_page_size,
                     max_total=settings.activities_page_size * max_pages,
                 )
+
                 def _key(it: Dict[str, Any]) -> datetime:
                     dt = parse_datetime_aware(
-                        it.get("timestamp") or it.get("time") or it.get("createdAt") or it.get("blockTime")
+                        it.get("timestamp")
+                        or it.get("time")
+                        or it.get("createdAt")
+                        or it.get("blockTime")
                     ) or datetime.fromtimestamp(0, tz=timezone.utc)
                     return dt
 
@@ -127,14 +148,24 @@ async def follow_user_loop(user_address: str, display_name: Optional[str], poll_
                 grace = timedelta(seconds=settings.activities_ts_grace_seconds)
                 for it in raw:
                     ts = parse_datetime_aware(
-                        it.get("timestamp") or it.get("time") or it.get("createdAt") or it.get("blockTime")
+                        it.get("timestamp")
+                        or it.get("time")
+                        or it.get("createdAt")
+                        or it.get("blockTime")
                     )
                     if ts and ts > (last_seen_ts - grace):
                         new_items.append(it)
                 if new_items:
-                    saved = await insert_activities(user, new_items)
+                    await insert_activities(user, new_items)
                     log.info("follow_saved", user=user_address, count=len(new_items))
-                    max_ts = max((normalize_activity(it)["ts"] for it in new_items if normalize_activity(it)["ts"]), default=last_seen_ts)
+                    max_ts = max(
+                        (
+                            normalize_activity(it)["ts"]
+                            for it in new_items
+                            if normalize_activity(it)["ts"]
+                        ),
+                        default=last_seen_ts,
+                    )
                     if max_ts and max_ts > last_seen_ts:
                         last_seen_ts = max_ts
                 await asyncio.sleep(interval)
@@ -146,11 +177,20 @@ async def follow_user_loop(user_address: str, display_name: Optional[str], poll_
                 await asyncio.sleep(min(60.0, interval))
 
 
-async def get_activities_for_user(session, user_pk: int, limit: int = 1000) -> List[Activity]:
+async def get_activities_for_user(
+    session, user_pk: int, limit: int = 1000
+) -> List[Activity]:
     from sqlalchemy import select
+
     return (
-        await session.execute(select(Activity).where(Activity.user_pk == user_pk).order_by(Activity.ts.desc()).limit(limit))
-    ).scalars().all()
-
-
-
+        (
+            await session.execute(
+                select(Activity)
+                .where(Activity.user_pk == user_pk)
+                .order_by(Activity.ts.desc())
+                .limit(limit)
+            )
+        )
+        .scalars()
+        .all()
+    )

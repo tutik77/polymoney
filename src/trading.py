@@ -21,11 +21,15 @@ class PolymarketTradingClient:
     def __init__(self) -> None:
         s = get_settings()
         if not s.private_key or not s.private_key.strip():
-            raise ValueError("POLY_PRIVATE_KEY is not set. Provide a private key in env.")
+            raise ValueError(
+                "POLY_PRIVATE_KEY is not set. Provide a private key in env."
+            )
         self._host: str = s.polymarket_clob_host
         self._chain_id: int = s.chain_id
         self._private_key: str = s.private_key.strip()
-        self._proxy_wallet: Optional[str] = s.proxy_wallet.strip() if s.proxy_wallet else None
+        self._proxy_wallet: Optional[str] = (
+            s.proxy_wallet.strip() if s.proxy_wallet else None
+        )
 
     def place_limit_order(
         self,
@@ -74,6 +78,7 @@ class PolymarketTradingClient:
         tif_value: Any = time_in_force.upper()
         try:
             from py_clob_client.order_builder import constants as obc  # type: ignore
+
             side_value = obc.BUY if side.lower() == "buy" else obc.SELL
         except Exception:
             pass
@@ -81,7 +86,10 @@ class PolymarketTradingClient:
         try:
             # Preferred typed path
             from py_clob_client.clob_types import OrderArgs, OrderType  # type: ignore
-            order_args = OrderArgs(price=price, size=size, side=side_value, token_id=outcome_token_id)
+
+            order_args = OrderArgs(
+                price=price, size=size, side=side_value, token_id=outcome_token_id
+            )
             signed = clob.create_order(order_args)
             tif_value = getattr(OrderType, time_in_force.upper(), OrderType.GTC)
             resp = clob.post_order(signed, tif_value)
@@ -99,11 +107,19 @@ class PolymarketTradingClient:
             return resp  # type: ignore[return-value]
 
 
-def place_order_simple(outcome_token_id: str, side: str, price: float, size: float, time_in_force: str = "GTC") -> Dict[str, Any]:
+def place_order_simple(
+    outcome_token_id: str,
+    side: str,
+    price: float,
+    size: float,
+    time_in_force: str = "GTC",
+) -> Dict[str, Any]:
     """Convenience function for quick use without instantiating the class."""
     client = PolymarketTradingClient()
-    return client.place_limit_order(outcome_token_id=outcome_token_id, side=side, price=price, size=size, time_in_force=time_in_force)
-
-
-
-
+    return client.place_limit_order(
+        outcome_token_id=outcome_token_id,
+        side=side,
+        price=price,
+        size=size,
+        time_in_force=time_in_force,
+    )
