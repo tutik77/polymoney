@@ -268,7 +268,9 @@ class PolymarketClient:
                 status = real_e.status
                 err_msg = f"Http {status}: {real_e.message}"
 
-            self._log.warning(
+            # 404 is expected for closed/removed tokens - log as debug
+            log_level = self._log.debug if status == 404 else self._log.warning
+            log_level(
                 "orderbook_error",
                 token=token_id[:20],
                 error=err_msg,
@@ -305,7 +307,10 @@ class PolymarketClient:
                 status = real_e.status
                 err_msg = f"Http {status}: {real_e.message}"
 
-            self._log.warning(
+            # 404 is expected for closed/removed tokens - log as debug
+            # Other errors are unexpected - log as warning
+            log_level = self._log.debug if status == 404 else self._log.warning
+            log_level(
                 "quote_error",
                 token=token_id[:20],
                 error=err_msg,

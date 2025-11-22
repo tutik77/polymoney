@@ -426,12 +426,22 @@ async def follow_user_realtime_sim(
                         quotes = best_quote_cache[str(asset)]
                         bid = quotes.get("bid")
                         ask = quotes.get("ask")
-                        live_price = (
-                            (ask if side == "buy" else bid)
-                            if (bid is not None or ask is not None)
-                            else event_price
-                        )
-
+                        
+                        # Skip if token is unavailable (404 or no quotes)
+                        # Both bid and ask are None means token not found on exchange
+                        if bid is None and ask is None:
+                            log.debug(
+                                "sim_skip_no_quotes",
+                                user=user_address,
+                                asset=str(asset)[:20],
+                                side=side,
+                                reason="token_unavailable_404",
+                            )
+                            continue
+                        
+                        # Use appropriate side quote
+                        live_price = ask if side == "buy" else bid
+                        
                         if live_price is None:
                             continue
                         slip = max(0.0, slippage_bps) / 10_000.0
