@@ -20,11 +20,11 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     # Limit memory to 512mb and use LRU eviction. Disable RDB save to save memory on fork if persistence isn't critical.
-    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru --save ""
+    command: ["redis-server", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru", "--save", ""]
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - redis_data_clean:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -158,7 +158,7 @@ services:
 
 volumes:
   db_data:
-  redis_data:
+  redis_data_clean:
 
 
 
