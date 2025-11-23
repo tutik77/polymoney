@@ -122,8 +122,8 @@ def sim_realtime_task(
 def settle_positions_task(
     self,
     sim_user: str,
-    force_settle_after_days: int = 2,
-    fetch_limit: int = 500,
+    force_settle_after_days: int = 3,
+    fetch_limit: int = 1000,
 ):
     async def _run():
         await dispose_engine()
@@ -155,8 +155,8 @@ def settle_positions_task(
 @celery_app.task(name="polymoney.settle_positions_all", bind=True)
 def settle_positions_all_task(
     self,
-    force_settle_after_days: int = 2,
-    fetch_limit: int = 500,
+    force_settle_after_days: int = 3,
+    fetch_limit: int = 1000,
 ):
     async def _run():
         await dispose_engine()

@@ -48,8 +48,8 @@ class SettlementResult:
 async def settle_resolved_positions(
     sim_user: str,
     *,
-    force_settle_after_days: int = 2,
-    fetch_limit: int = 500,
+    force_settle_after_days: int = 3,
+    fetch_limit: int = 1000,
 ) -> SettlementResult:
     """
     Settle resolved positions for a simulator.

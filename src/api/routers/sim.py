@@ -297,7 +297,7 @@ async def sim_db_leader_stats(
 
 @router.post("/{sim_user}/settle")
 async def settle_positions(
-    sim_user: str, force_settle_after_days: int = 2, fetch_limit: int = 500
+    sim_user: str, force_settle_after_days: int = 3, fetch_limit: int = 1000
 ) -> dict:
     result = settle_positions_task.apply_async(
         kwargs={
