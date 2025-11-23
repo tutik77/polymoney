@@ -123,6 +123,7 @@ def settle_positions_task(
     self,
     sim_user: str,
     force_settle_after_days: int = 2,
+    fetch_limit: int = 500,
 ):
     async def _run():
         await dispose_engine()
@@ -130,6 +131,7 @@ def settle_positions_task(
         result = await settle_resolved_positions(
             sim_user=sim_user,
             force_settle_after_days=force_settle_after_days,
+            fetch_limit=fetch_limit,
         )
         return {
             "settled_count": result.settled_count,
@@ -154,6 +156,7 @@ def settle_positions_task(
 def settle_positions_all_task(
     self,
     force_settle_after_days: int = 2,
+    fetch_limit: int = 500,
 ):
     async def _run():
         await dispose_engine()
@@ -180,6 +183,7 @@ def settle_positions_all_task(
                     res = await settle_resolved_positions(
                         sim_user=su,
                         force_settle_after_days=force_settle_after_days,
+                        fetch_limit=fetch_limit,
                     )
                     totals["settled_count"] += res.settled_count
                     totals["total_pnl"] += res.total_pnl

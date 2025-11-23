@@ -49,6 +49,7 @@ async def settle_resolved_positions(
     sim_user: str,
     *,
     force_settle_after_days: int = 2,
+    fetch_limit: int = 500,
 ) -> SettlementResult:
     """
     Settle resolved positions for a simulator.
@@ -65,6 +66,7 @@ async def settle_resolved_positions(
     Args:
         sim_user: Simulator user ID
         force_settle_after_days: Days after end_date to force settle (default: 2)
+        fetch_limit: Max number of closed positions to fetch from leader (default: 500)
 
     Returns:
         SettlementResult with details of settled positions
@@ -117,7 +119,7 @@ async def settle_resolved_positions(
                 try:
                     closed_positions_raw = await client.fetch_user_closed_positions(
                         leader_address,
-                        max_total=2500,
+                        max_total=fetch_limit,
                         sort_by="timestamp",
                         sort_direction="DESC",
                     )
