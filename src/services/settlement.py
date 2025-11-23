@@ -117,7 +117,7 @@ async def settle_resolved_positions(
                 try:
                     closed_positions_raw = await client.fetch_user_closed_positions(
                         leader_address,
-                        max_total=500,
+                        max_total=2500,
                         sort_by="timestamp",
                         sort_direction="DESC",
                     )
