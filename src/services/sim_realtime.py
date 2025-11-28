@@ -451,6 +451,16 @@ async def follow_user_realtime_sim(
                             else live_price * (1.0 - slip)
                         )
 
+                        # --- Filter: Max Price Check ---
+                        if exec_price > 0.9:
+                            # log.info(
+                            #     "sim_skip_price_too_high",
+                            #     user=user_address,
+                            #     asset=str(asset)[:20],
+                            #     price=exec_price,
+                            # )
+                            continue
+
                         # --- Event Exposure Check: Prevent adding to existing positions ---
                         if side == "buy":
                             # Check if we already have an active position for this asset
@@ -501,10 +511,26 @@ async def follow_user_realtime_sim(
                             available_cash = float(p_row["cash"]) if p_row else 0.0
                             cost = exec_size * exec_price
                             if cost > available_cash:
-                                if exec_price > 1e-9:
-                                    exec_size = available_cash / exec_price
+                                # Not enough cash -> skip trade
+                                continue
+                        
+                        # --- Minimum Order Value Check ---
+                        # Polymarket requires at least $1 per order
+                        if side == "buy" and exec_price > 1e-9:
+                            current_val = exec_size * exec_price
+                            if current_val < 1.0:
+                                # Try to bump to $1
+                                required_size = 1.0 / exec_price
+                                
+                                # Check cash availability
+                                p_row = await get_sim_portfolio(session, sim_user_id)
+                                available_cash = float(p_row["cash"]) if p_row else 0.0
+                                
+                                if required_size * exec_price <= available_cash:
+                                    exec_size = required_size
                                 else:
-                                    exec_size = 0.0
+                                    # Not enough cash to meet minimum $1 order
+                                    continue
 
                         # Execution type marker for DB: keep short to fit VARCHAR(16)
                         exec_type = "best"

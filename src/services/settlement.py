@@ -102,7 +102,6 @@ async def settle_resolved_positions(
     sim_user: str,
     *,
     force_settle_after_days: int = 3,
-    fetch_limit: int = 1000,
 ) -> SettlementResult:
     log = structlog.get_logger()
     now = datetime.now(timezone.utc)
@@ -161,7 +160,11 @@ async def settle_resolved_positions(
                         condition_id=condition_id[:32],
                         count=len(cond_positions),
                     )
+                    # Если рынок не найден (например, еще не закрыт и мы фильтруем closed=true),
+                    # мы НЕ сеттлим позицию сразу. Мы ждем force_settle_after_days (3 дня).
+                    # Если через 3 дня рынок все еще не найден/не закрыт - возвращаем средства (avg_cost).
                     for pos in cond_positions:
+                        # Проверяем, прошло ли 3 дня с end_date
                         if pos.end_date and pos.end_date < force_settle_threshold:
                             await _settle_single_position(
                                 session=session,
