@@ -6,7 +6,7 @@ import structlog
 
 from ..db import ensure_schema
 from ..logging_setup import configure_logging
-from .routers import admin, health, sim, trading, users, logs
+from .routers import admin, health, sim, trading, users, logs, test
 
 
 def create_app() -> FastAPI:
@@ -18,24 +18,23 @@ def create_app() -> FastAPI:
     app.include_router(trading.router)
     app.include_router(sim.router)
     app.include_router(logs.router)
+    app.include_router(test.router)
 
     @app.on_event("startup")
-    async def _startup() -> None:  # pragma: no cover - side-effectful
+    async def _startup() -> None:
         configure_logging()
         log = structlog.get_logger()
-        # Retry DB readiness to avoid race with Postgres in Docker
         last_exc: Exception | None = None
         for attempt in range(1, 21):
             try:
                 await ensure_schema()
                 last_exc = None
                 break
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 last_exc = e
                 log.warning("db_retry", attempt=attempt, error=str(e)[:100])
                 await asyncio.sleep(min(1 * attempt, 5))
         if last_exc is not None:
-            # surface error if never connected
             raise last_exc
 
     return app
@@ -44,7 +43,7 @@ def create_app() -> FastAPI:
 app = create_app()
 
 
-if __name__ == "__main__":  # pragma: no cover - manual run
+if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run("src.api.main:app", host="0.0.0.0", port=8000, reload=False)

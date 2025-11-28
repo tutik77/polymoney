@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from pydantic import BaseModel, Field
 
@@ -90,12 +90,7 @@ class IngestOnceRequest(BaseModel):
     closed_max_total: Optional[int] = None
 
 
-# Simulator schemas
-
-
 class SimRealtimeStartRequest(BaseModel):
-    """Request to start realtime simulation for user(s)"""
-
     users: list[str] = []
     sim_user: Optional[str] = "default"
     initial_cash: Optional[float] = 10_000_000.0
@@ -103,20 +98,15 @@ class SimRealtimeStartRequest(BaseModel):
     slippage_bps: Optional[float] = 0.0
     sizing_strategy: Optional[str] = "target_profit"
     sizing_value: Optional[float] = 0.005
-    # max_trade_size: Optional[float] = None  # Optional cap on trade size in shares
 
 
 class SimPositionOut(BaseModel):
-    """Single position in realtime sim snapshot"""
-
     asset: str
     quantity: float
     avg_cost: float
 
 
 class SimPortfolioOut(BaseModel):
-    """Realtime sim portfolio snapshot"""
-
     user: str
     cash: float
     realized_pnl: float
@@ -132,8 +122,6 @@ class SimPortfolioGlobalOut(BaseModel):
 
 
 class SimActivePositionDbOut(BaseModel):
-    """Single active position in the sim DB (per leader + asset)"""
-
     sim_user: str
     leader_address: Optional[str]
     asset: str
@@ -145,8 +133,6 @@ class SimActivePositionDbOut(BaseModel):
 
 
 class SimClosedPositionDbOut(BaseModel):
-    """Single closed position from sim DB"""
-
     title: Optional[str] = None
     asset: str
     quantity: float
@@ -175,22 +161,18 @@ class SimTradeOut(BaseModel):
 
 
 class SettledPositionOut(BaseModel):
-    """Details about a single position that was settled"""
-
     asset: str
     leader_address: str
     quantity: float
     avg_cost: float
     payout: float
     realized_pnl: float
-    settlement_type: str  # "resolved" or "expired"
+    settlement_type: str
     end_date: Optional[datetime] = None
     title: Optional[str] = None
 
 
 class SettlementResultOut(BaseModel):
-    """Result of calling the settlement endpoint"""
-
     sim_user: str
     settled_count: int
     total_pnl: float
@@ -199,10 +181,32 @@ class SettlementResultOut(BaseModel):
 
 
 class SimLeaderStatsOut(BaseModel):
-    """Aggregated stats per tracked leader for a sim user"""
-
     leader_address: str
     active_count: int
     closed_count: int
     realized_pnl: float
     win_rate: float
+
+
+class TokenInfo(BaseModel):
+    token_id: str
+    outcome: str
+    price: Optional[float] = None
+    winner: Optional[bool] = None
+
+
+class UserBetStatus(BaseModel):
+    token_id: str
+    outcome_name: str
+    status: str
+    payout: float
+
+
+class MarketResolutionResponse(BaseModel):
+    condition_id: str
+    question: str
+    closed: bool
+    active: bool
+    umaResolutionStatus: Optional[str] = None
+    tokens: List[TokenInfo]
+    user_bet_status: Optional[UserBetStatus] = None

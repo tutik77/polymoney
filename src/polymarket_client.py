@@ -317,3 +317,97 @@ class PolymarketClient:
                 status=status,
             )
             return {"bid": None, "ask": None}
+
+    async def fetch_market_by_condition_id(
+        self, condition_id: str, *, fetch_prices: bool = True
+    ) -> Optional[Dict[str, Any]]:
+        gamma_api = "https://gamma-api.polymarket.com"
+        url = f"{gamma_api}/markets"
+        params = {"condition_ids": condition_id, "closed": "true"}
+        
+        try:
+            data = await self._get_json(url, params=params)
+            if isinstance(data, list) and len(data) > 0:
+                market = data[0]
+                
+                clob_token_ids_str = market.get("clobTokenIds", "[]")
+                outcomes_str = market.get("outcomes", "[]")
+                outcome_prices_str = market.get("outcomePrices", "[]")
+                
+                try:
+                    clob_token_ids = orjson.loads(clob_token_ids_str)
+                    outcomes = orjson.loads(outcomes_str)
+                    outcome_prices = orjson.loads(outcome_prices_str)
+                except Exception:
+                    clob_token_ids = []
+                    outcomes = []
+                    outcome_prices = []
+                
+                tokens = []
+                for i, token_id in enumerate(clob_token_ids):
+                    token_data = {
+                        "token_id": token_id,
+                        "outcome": outcomes[i] if i < len(outcomes) else f"Outcome {i+1}",
+                    }
+                    
+                    if i < len(outcome_prices):
+                        try:
+                            token_data["price"] = float(outcome_prices[i])
+                        except (ValueError, TypeError):
+                            token_data["price"] = None
+                    
+                    if fetch_prices and token_data.get("price") is None:
+                        live_price = await self.fetch_token_price(token_id)
+                        token_data["price"] = live_price
+                    
+                    tokens.append(token_data)
+                
+                market["tokens"] = tokens
+                market["outcomes"] = outcomes
+                
+                return market
+            return None
+        except Exception as e:
+            real_e = e
+            if isinstance(e, RetryError):
+                real_e = e.last_attempt.exception()
+            
+            self._log.warning(
+                "fetch_market_error",
+                condition_id=condition_id[:32],
+                error=str(real_e)[:200],
+            )
+            return None
+
+    async def fetch_token_price(self, token_id: str) -> Optional[float]:
+        url = f"{self._clob_api}/price"
+        params = {"token_id": token_id}
+        
+        try:
+            data = await self._get_json(url, params=params)
+            if not isinstance(data, dict):
+                return None
+                
+            price = data.get("price")
+            if price is not None:
+                return float(price)
+            return None
+        except Exception as e:
+            real_e = e
+            if isinstance(e, RetryError):
+                real_e = e.last_attempt.exception()
+            
+            err_msg = str(real_e)
+            status = None
+            if isinstance(real_e, aiohttp.ClientResponseError):
+                status = real_e.status
+                err_msg = f"Http {status}: {real_e.message}"
+            
+            log_level = self._log.debug if status == 404 else self._log.warning
+            log_level(
+                "token_price_error",
+                token=token_id[:20],
+                error=err_msg,
+                status=status,
+            )
+            return None
