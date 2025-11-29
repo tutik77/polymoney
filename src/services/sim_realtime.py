@@ -193,6 +193,7 @@ async def follow_user_realtime_sim(
         ensure_sim_global,
         increment_global_portfolio,
         buy_sim_position,
+        sell_sim_position,
         get_sim_active_position_by_leader_asset,
         get_sim_portfolio,
         insert_trade_if_new,
@@ -589,20 +590,52 @@ async def follow_user_realtime_sim(
                             cash_delta = -trade_value_usdc
                             realized_delta = 0.0
                         else:
-                            # SELL is temporarily disabled for strategy testing
-                            # We record the trade signal but do NOT execute the sell in portfolio
-                            executed_size = 0.0
-                            cash_delta = 0.0
-                            realized_delta = 0.0
-                            log.info(
-                                "sim_sell_skip",
-                                user=user_address,
-                                asset=str(asset)[:20],
-                                reason="strategy_testing_mode",
+                            # SELL: Close all active positions for this asset by selling at market bid
+                            
+                            # Check if we have an active position for this asset
+                            existing_pos = (
+                                await get_sim_active_position_by_leader_asset(
+                                    session,
+                                    sim_user=sim_user_id,
+                                    leader_address=user_address,
+                                    asset=str(asset),
+                                )
                             )
-
-                            # Skip DB update for sell side since we didn't execute
-                            continue
+                            
+                            if not existing_pos or existing_pos.quantity <= 1e-9:
+                                # No position to sell → skip
+                                log.debug(
+                                    "sim_sell_skip_no_position",
+                                    user=user_address,
+                                    asset=str(asset)[:20],
+                                )
+                                continue
+                            
+                            # Sell the entire position at market bid price
+                            held_quantity = float(existing_pos.quantity)
+                            
+                            # Use the bid price (what we can sell at)
+                            sell_result = await sell_sim_position(
+                                session,
+                                sim_user=sim_user_id,
+                                leader_address=user_address,
+                                asset=str(asset),
+                                price=exec_price,  # This is already set to bid with slippage
+                                size=held_quantity,  # Sell entire position
+                            )
+                            
+                            if not sell_result:
+                                log.warning(
+                                    "sim_sell_failed",
+                                    user=user_address,
+                                    asset=str(asset)[:20],
+                                )
+                                continue
+                            
+                            executed_size, new_qty, realized_pnl = sell_result
+                            trade_value_usdc = exec_price * executed_size
+                            cash_delta = trade_value_usdc  # Positive cash from sale
+                            realized_delta = realized_pnl
 
                         # Update global portfolio (cash and realized PnL)
                         await increment_global_portfolio(
